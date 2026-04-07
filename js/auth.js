@@ -142,7 +142,6 @@ document.getElementById('btn-register').addEventListener('click', function() {
     .then(function(res) {
       if (res.error) throw res.error;
       var userId = res.data.user.id;
-      return sb.from('profiles').insert({ id: userId, username: username });
     })
     .then(function(res) {
       if (res.error) throw res.error;
