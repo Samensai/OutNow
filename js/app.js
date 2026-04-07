@@ -25,18 +25,21 @@ const filterPanel = $('filter-panel');
 const panelOverlay = $('panel-overlay');
 
 // ── INIT ──
-window.addEventListener('load', () => {
-  setTimeout(() => {
+window.addEventListener('load', function() {
+  setTimeout(function() {
     splash.style.display = 'none';
     app.classList.remove('hidden');
-    const onboarded = localStorage.getItem('outnow_onboarded');
-    if (onboarded) {
-      showScreen('home');
-      buildDeck();
-      renderCards();
-    } else {
-      showScreen('onboarding');
-    }
+    var onboarded = localStorage.getItem('outnow_onboarded');
+    loadEvents().then(function() {
+      state.events = JSON.parse(JSON.stringify(EVENTS));
+      if (onboarded) {
+        showScreen('home');
+        buildDeck();
+        renderCards();
+      } else {
+        showScreen('onboarding');
+      }
+    });
   }, 2000);
 });
 
