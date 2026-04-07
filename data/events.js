@@ -1,117 +1,42 @@
-// data/events.js — Mock événements OutNow
-// En production, ces données viendraient d'APIs (Eventbrite, Billetweb, OpenAgenda...)
+let EVENTS = [];
 
-const EVENTS = [
-  {
-    id: 1,
-    title: "Festival Nuits Sonores",
-    category: "concert",
-    tags: ["Festival", "Électro", "Gratuit l'entrée"],
-    date: "Ce vendredi · 22h",
-    location: "Halle Tony Garnier, Lyon",
-    distance: "1.2 km",
-    price: 0,
-    priceLabel: "Gratuit",
-    image: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=80",
-    description: "Le festival incontournable de la scène électronique lyonnaise. 5 scènes, 80 artistes, 3 nuits de musique non-stop dans les plus beaux lieux de la ville.",
+async function loadEvents() {
+  const CLE_API = 'TA_CLE_ICI';
+  const VILLE = 'Paris'; // ou Lyon, Bordeaux...
+
+  const res = await fetch(
+    `https://api.openagenda.com/v2/events?key=${6cf33cc591df40a9b0fac2a946d4c3ec}&city=${VILLE}&size=20&lang=fr`
+  );
+  const data = await res.json();
+
+  EVENTS = data.events.map(e => ({
+    id: e.uid,
+    title: e.title.fr || e.title.en || 'Événement',
+    category: mapCategory(e.keywords),
+    tags: (e.keywords || []).slice(0, 3),
+    date: formatDate(e.timings?.[0]?.begin),
+    location: e.location?.name || e.location?.city || VILLE,
+    distance: '—',
+    price: e.registration?.length > 0 ? 10 : 0,
+    priceLabel: e.registration?.length > 0 ? 'Payant' : 'Gratuit',
+    image: e.image?.base + e.image?.filename || 'https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600',
+    description: e.description?.fr || '',
     liked: false,
-  },
-  {
-    id: 2,
-    title: "Soirée Rooftop",
-    category: "soiree",
-    tags: ["Soirée", "Rooftop", "18–30 ans"],
-    date: "Samedi · 20h",
-    location: "Le Sucre, Lyon",
-    distance: "2.4 km",
-    price: 12,
-    priceLabel: "12€",
-    image: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80",
-    description: "Vue panoramique sur Lyon, musique House et cocktails. La soirée rooftop qui fait le buzz depuis 3 ans. Dressing code : smart casual.",
-    liked: false,
-  },
-  {
-    id: 3,
-    title: "Expo Immersive Klimt",
-    category: "expo",
-    tags: ["Expo", "Art immersif", "Incontournable"],
-    date: "Jusqu'au 30 juin",
-    location: "Centre Pompidou, Paris",
-    distance: "3.1 km",
-    price: 16,
-    priceLabel: "16€",
-    image: "https://images.unsplash.com/photo-1580136579312-94651dfd596d?w=600&q=80",
-    description: "Plongez dans l'univers doré de Gustav Klimt. Une expérience visuelle et sonore unique dans un espace de 2000m² avec projections géantes.",
-    liked: false,
-  },
-  {
-    id: 4,
-    title: "Match PSG · Olympique",
-    category: "sport",
-    tags: ["Football", "Ligue 1", "Ambiance"],
-    date: "Dimanche · 17h",
-    location: "Parc des Princes, Paris",
-    distance: "5.8 km",
-    price: 35,
-    priceLabel: "35€",
-    image: "https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?w=600&q=80",
-    description: "Le choc de la Ligue 1 au Parc des Princes. Ambiance garantie dans l'un des stades les plus électriques d'Europe.",
-    liked: false,
-  },
-  {
-    id: 5,
-    title: "Street Food Market",
-    category: "food",
-    tags: ["Food", "Weekend", "Extérieur"],
-    date: "Sam & Dim · 11h–22h",
-    location: "Quais de Saône, Lyon",
-    distance: "0.8 km",
-    price: 0,
-    priceLabel: "Gratuit",
-    image: "https://images.unsplash.com/photo-1565123409695-7b5ef63a2efb?w=600&q=80",
-    description: "30 food trucks de cuisines du monde, concerts acoustiques en live, et vue sur les quais. Le rendez-vous gourmand de la saison.",
-    liked: false,
-  },
-  {
-    id: 6,
-    title: "Concert Jazz Manouche",
-    category: "concert",
-    tags: ["Jazz", "Live", "Intimiste"],
-    date: "Jeudi · 21h",
-    location: "Le Bab-Ilo, Paris",
-    distance: "1.5 km",
-    price: 8,
-    priceLabel: "8€",
-    image: "https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?w=600&q=80",
-    description: "Une soirée jazz manouche dans une cave voûtée du Marais. Trio acoustique, conso offerte à l'entrée. Ambiance intimiste garantie.",
-    liked: false,
-  },
-  {
-    id: 7,
-    title: "Nuit des Musées",
-    category: "expo",
-    tags: ["Musées", "Gratuit", "Nuit blanche"],
-    date: "Samedi · 19h–01h",
-    location: "Musée des Beaux-Arts",
-    distance: "0.9 km",
-    price: 0,
-    priceLabel: "Gratuit",
-    image: "https://images.unsplash.com/photo-1554907984-15263bfd63bd?w=600&q=80",
-    description: "Une nuit pour découvrir les collections sous un jour nouveau. Performances artistiques, visites guidées thématiques et DJ sets dans les galeries.",
-    liked: false,
-  },
-  {
-    id: 8,
-    title: "Tournoi Beach Volley",
-    category: "sport",
-    tags: ["Sport", "Beach", "Équipe"],
-    date: "Dimanche · 10h",
-    location: "Plage des Minimes, La Rochelle",
-    distance: "4.2 km",
-    price: 5,
-    priceLabel: "5€ / équipe",
-    image: "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=600&q=80",
-    description: "Tournoi open de beach volley, équipes de 4. Inscription le matin. Barbecue et musique après les matchs. Ambiance décontractée garantie.",
-    liked: false,
-  },
-];
+  }));
+}
+
+function mapCategory(keywords = []) {
+  const k = keywords.join(' ').toLowerCase();
+  if (k.includes('concert') || k.includes('musique')) return 'concert';
+  if (k.includes('expo') || k.includes('art')) return 'expo';
+  if (k.includes('sport')) return 'sport';
+  if (k.includes('food') || k.includes('gastronomie')) return 'food';
+  return 'soiree';
+}
+
+function formatDate(iso) {
+  if (!iso) return 'Prochainement';
+  return new Date(iso).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+loadEvents();
