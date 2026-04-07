@@ -1,114 +1,88 @@
-var EVENTS = [
-  {
-    id: 1,
-    title: "Festival Nuits Sonores",
-    category: "concert",
-    tags: ["Festival", "Electro", "Gratuit"],
-    date: "Ce vendredi 22h",
-    location: "Halle Tony Garnier, Lyon",
-    distance: "1.2 km",
-    price: 0,
-    priceLabel: "Gratuit",
-    image: "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=80",
-    description: "Le festival incontournable de la scene electronique lyonnaise. 5 scenes, 80 artistes, 3 nuits de musique non-stop dans les plus beaux lieux de la ville.",
-    liked: false
-  },
-  {
-    id: 2,
-    title: "Soiree Rooftop",
-    category: "soiree",
-    tags: ["Soiree", "Rooftop", "18-30 ans"],
-    date: "Samedi 20h",
-    location: "Le Sucre, Lyon",
-    distance: "2.4 km",
-    price: 12,
-    priceLabel: "12 euros",
-    image: "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80",
-    description: "Vue panoramique sur Lyon, musique House et cocktails. La soiree rooftop qui fait le buzz depuis 3 ans.",
-    liked: false
-  },
-  {
-    id: 3,
-    title: "Expo Immersive Klimt",
-    category: "expo",
-    tags: ["Expo", "Art immersif", "Incontournable"],
-    date: "Jusqu'au 30 juin",
-    location: "Centre Pompidou, Paris",
-    distance: "3.1 km",
-    price: 16,
-    priceLabel: "16 euros",
-    image: "https://images.unsplash.com/photo-1580136579312-94651dfd596d?w=600&q=80",
-    description: "Plongez dans l'univers dore de Gustav Klimt. Une experience visuelle et sonore unique dans un espace de 2000m2 avec projections geantes.",
-    liked: false
-  },
-  {
-    id: 4,
-    title: "Match PSG Olympique",
-    category: "sport",
-    tags: ["Football", "Ligue 1", "Ambiance"],
-    date: "Dimanche 17h",
-    location: "Parc des Princes, Paris",
-    distance: "5.8 km",
-    price: 35,
-    priceLabel: "35 euros",
-    image: "https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?w=600&q=80",
-    description: "Le choc de la Ligue 1 au Parc des Princes. Ambiance garantie dans l'un des stades les plus electriques d'Europe.",
-    liked: false
-  },
-  {
-    id: 5,
-    title: "Street Food Market",
-    category: "food",
-    tags: ["Food", "Weekend", "Exterieur"],
-    date: "Sam et Dim 11h-22h",
-    location: "Quais de Saone, Lyon",
-    distance: "0.8 km",
-    price: 0,
-    priceLabel: "Gratuit",
-    image: "https://images.unsplash.com/photo-1565123409695-7b5ef63a2efb?w=600&q=80",
-    description: "30 food trucks de cuisines du monde, concerts acoustiques en live, et vue sur les quais.",
-    liked: false
-  },
-  {
-    id: 6,
-    title: "Concert Jazz Manouche",
-    category: "concert",
-    tags: ["Jazz", "Live", "Intimiste"],
-    date: "Jeudi 21h",
-    location: "Le Bab-Ilo, Paris",
-    distance: "1.5 km",
-    price: 8,
-    priceLabel: "8 euros",
-    image: "https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?w=600&q=80",
-    description: "Une soiree jazz manouche dans une cave voutee du Marais. Trio acoustique, conso offerte a l'entree.",
-    liked: false
-  },
-  {
-    id: 7,
-    title: "Nuit des Musees",
-    category: "expo",
-    tags: ["Musees", "Gratuit", "Nuit blanche"],
-    date: "Samedi 19h-01h",
-    location: "Musee des Beaux-Arts",
-    distance: "0.9 km",
-    price: 0,
-    priceLabel: "Gratuit",
-    image: "https://images.unsplash.com/photo-1554907984-15263bfd63bd?w=600&q=80",
-    description: "Une nuit pour decouvrir les collections sous un jour nouveau. Performances artistiques et DJ sets dans les galeries.",
-    liked: false
-  },
-  {
-    id: 8,
-    title: "Tournoi Beach Volley",
-    category: "sport",
-    tags: ["Sport", "Beach", "Equipe"],
-    date: "Dimanche 10h",
-    location: "Plage des Minimes, La Rochelle",
-    distance: "4.2 km",
-    price: 5,
-    priceLabel: "5 euros par equipe",
-    image: "https://images.unsplash.com/photo-1612872087720-bb876e2e67d1?w=600&q=80",
-    description: "Tournoi open de beach volley, equipes de 4. Inscription le matin. Barbecue et musique apres les matchs.",
-    liked: false
-  }
-];
+var EVENTS = [];
+
+var OPENAGENDA_KEY = "6cf33cc591df40a9b0fac2a946d4c3ec";
+var VILLE = "Paris";
+
+function loadEvents() {
+  var url = "https://api.openagenda.com/v2/events"
+    + "?key=" + OPENAGENDA_KEY
+    + "&city=" + encodeURIComponent(VILLE)
+    + "&size=20"
+    + "&lang=fr"
+    + "&relative[]=current"
+    + "&relative[]=upcoming";
+
+  return fetch(url)
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (!data.events || data.events.length === 0) {
+        console.warn("Aucun evenement recu depuis OpenAgenda.");
+        return;
+      }
+      EVENTS = data.events.map(function(e, i) {
+        var title = (e.title && (e.title.fr || e.title.en)) || "Evenement";
+        var desc = (e.description && (e.description.fr || e.description.en)) || "";
+        var loc = (e.location && (e.location.name || e.location.city)) || VILLE;
+        var image = (e.image && e.image.base && e.image.filename)
+          ? (e.image.base + e.image.filename)
+          : fallbackImage(i);
+        var price = 0;
+        var priceLabel = "Gratuit";
+        if (e.registration && e.registration.length > 0) {
+          price = 10;
+          priceLabel = "Payant";
+        }
+        var dateStr = "Prochainement";
+        if (e.timings && e.timings[0] && e.timings[0].begin) {
+          var d = new Date(e.timings[0].begin);
+          dateStr = d.toLocaleDateString("fr-FR", {
+            weekday: "long", day: "numeric", month: "long",
+            hour: "2-digit", minute: "2-digit"
+          });
+        }
+        var keywords = Array.isArray(e.keywords) ? e.keywords : [];
+        var cat = detectCategory(keywords, title);
+        var tags = keywords.slice(0, 3);
+        if (tags.length === 0) tags = [cat];
+
+        return {
+          id: e.uid || i,
+          title: title,
+          category: cat,
+          tags: tags,
+          date: dateStr,
+          location: loc,
+          distance: "...",
+          price: price,
+          priceLabel: priceLabel,
+          image: image,
+          description: desc,
+          liked: false
+        };
+      });
+    })
+    .catch(function(err) {
+      console.error("Erreur OpenAgenda:", err);
+    });
+}
+
+function detectCategory(keywords, title) {
+  var text = (keywords.join(" ") + " " + title).toLowerCase();
+  if (text.match(/concert|musique|live|festival|dj/)) return "concert";
+  if (text.match(/expo|exposition|art|musee|galerie/)) return "expo";
+  if (text.match(/sport|foot|basket|tennis|volley|course/)) return "sport";
+  if (text.match(/food|gastronomie|marche|cuisine|restaurant/)) return "food";
+  return "soiree";
+}
+
+function fallbackImage(i) {
+  var imgs = [
+    "https://images.unsplash.com/photo-1470229722913-7c0e2dbbafd3?w=600&q=80",
+    "https://images.unsplash.com/photo-1516450360452-9312f5e86fc7?w=600&q=80",
+    "https://images.unsplash.com/photo-1580136579312-94651dfd596d?w=600&q=80",
+    "https://images.unsplash.com/photo-1489944440615-453fc2b6a9a9?w=600&q=80",
+    "https://images.unsplash.com/photo-1565123409695-7b5ef63a2efb?w=600&q=80",
+    "https://images.unsplash.com/photo-1415201364774-f6f0bb35f28f?w=600&q=80"
+  ];
+  return imgs[i % imgs.length];
+}
