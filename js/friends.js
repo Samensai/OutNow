@@ -124,10 +124,25 @@ function renderSearchResults(users) {
       '<div class="friend-name">' + u.username + '</div>' +
       (isFriend
         ? '<div class="friend-badge">Ami</div>'
-        : '<button class="btn-add-friend" onclick="sendFriendRequest(\'' + u.id + '\').then(function(){ document.getElementById(\'search-results\').innerHTML = \'<div class=\\\'empty-state\\\'>Demande envoyee !\' + \'</div>\'; })">Ajouter</button>'
+        : '<button class="btn-add-friend" data-id="' + u.id + '">Ajouter</button>'
       ) +
     '</div>';
   }).join('');
+
+  // Attache les events après le rendu
+  el.querySelectorAll('.btn-add-friend').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var userId = btn.dataset.id;
+      btn.textContent = '...';
+      btn.disabled = true;
+      sendFriendRequest(userId).then(function() {
+        btn.textContent = 'Demande envoyee !';
+      }).catch(function(err) {
+        btn.textContent = 'Erreur';
+        console.error(err);
+      });
+    });
+  });
 }
 
 // Search input handler
