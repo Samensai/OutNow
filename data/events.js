@@ -3,7 +3,7 @@ var EVENTS_PAGE = 0;
 var EVENTS_LOADING = false;
 var EVENTS_EXHAUSTED = false;
 
-var OPENAGENDA_KEY = "TA_CLE_ICI";
+var OPENAGENDA_KEY = "6cf33cc591df40a9b0fac2a946d4c3ec";
 var AGENDA_UIDS = [61665301, 52870970];
 var SEEN_IDS = {};
 
