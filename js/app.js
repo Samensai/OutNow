@@ -1,6 +1,5 @@
-// js/app.js — OutNow PWA
+// js/app.js — OutNow PWA (sans init, geree par index.html)
 
-// ── STATE ──
 var state = {
   events: [],
   deck: [],
@@ -8,92 +7,21 @@ var state = {
   currentFilter: { cat: 'all', distance: 15, budget: 999, when: 'today' },
   liked: [],
   currentDetail: null,
-  group: null,
-  groupDeck: [],
-  groupLikes: {},
-  obSlide: 0,
 };
 
-// ── DOM REFS ──
 var $ = function(id) { return document.getElementById(id); };
-var splash = $('splash');
-var app = $('app');
 var cardStack = $('card-stack');
-var groupCardStack = $('group-card-stack');
 var likesGrid = $('likes-grid');
 var detailContent = $('detail-content');
 var filterPanel = $('filter-panel');
 var panelOverlay = $('panel-overlay');
 
-// ── INIT ──
-window.addEventListener('load', function() {
-  setTimeout(function() {
-    splash.style.display = 'none';
-    app.classList.remove('hidden');
-    var onboarded = localStorage.getItem('outnow_onboarded');
-    loadEvents().then(function() {
-      state.events = JSON.parse(JSON.stringify(EVENTS));
-      if (onboarded) {
-        showScreen('home');
-        buildDeck();
-        renderCards();
-      } else {
-        showScreen('onboarding');
-      }
-    });
-  }, 2000);
-});
-
-// ── SCREEN ROUTING ──
 function showScreen(name) {
   document.querySelectorAll('.screen').forEach(function(s) { s.classList.remove('active'); });
   var target = document.getElementById('screen-' + name);
   if (target) target.classList.add('active');
-  document.querySelectorAll('.nav-item').forEach(function(n) {
-    n.classList.toggle('active', n.dataset.screen === name);
-  });
 }
 
-document.querySelectorAll('.nav-item').forEach(function(btn) {
-  btn.addEventListener('click', function() {
-    var s = btn.dataset.screen;
-    showScreen(s);
-    if (s === 'likes') renderLikes();
-    if (s === 'home') renderCards();
-  });
-});
-
-// ── ONBOARDING ──
-var obSlide = 0;
-var obSlides = document.querySelectorAll('.ob-slide');
-var obDots = document.querySelectorAll('.dot');
-
-function goToObSlide(n) {
-  obSlides.forEach(function(s) { s.classList.remove('active'); });
-  obDots.forEach(function(d) { d.classList.remove('active'); });
-  obSlides[n].classList.add('active');
-  obDots[n].classList.add('active');
-  obSlide = n;
-  $('btn-next-ob').textContent = n === obSlides.length - 1 ? 'Commencer !' : 'Continuer';
-}
-
-$('btn-next-ob').addEventListener('click', function() {
-  if (obSlide < obSlides.length - 1) {
-    goToObSlide(obSlide + 1);
-  } else {
-    finishOnboarding();
-  }
-});
-$('btn-skip-ob').addEventListener('click', finishOnboarding);
-
-function finishOnboarding() {
-  localStorage.setItem('outnow_onboarded', '1');
-  showScreen('home');
-  buildDeck();
-  renderCards();
-}
-
-// ── DECK BUILDER ──
 function buildDeck() {
   var cat = state.currentFilter.cat;
   var budget = state.currentFilter.budget;
@@ -111,19 +39,15 @@ function buildDeck() {
   newEvents.forEach(function(e) { state.deck.push(e); });
 }
 
-// ── CARD RENDERER ──
 function renderCards() {
   cardStack.innerHTML = '';
   if (state.deck.length === 0) {
     if (!EVENTS_LOADING && !EVENTS_EXHAUSTED) {
-      loadEvents().then(function() {
-        buildDeck();
-        renderCards();
-      });
       cardStack.innerHTML = '<div class="card-empty"><div class="empty-emoji">⏳</div><h3>Chargement...</h3></div>';
+      loadEvents().then(function() { buildDeck(); renderCards(); });
       return;
     }
-    cardStack.innerHTML = '<div class="card-empty"><div class="empty-emoji">😴</div><h3>Plus de sorties ici !</h3><p style="color:var(--text3);font-size:14px;margin-top:8px">Change tes filtres ou reviens plus tard.</p></div>';
+    cardStack.innerHTML = '<div class="card-empty"><div class="empty-emoji">😴</div><h3>Plus de sorties !</h3><p style="color:var(--text3);font-size:14px;margin-top:8px">Reviens plus tard.</p></div>';
     return;
   }
   state.deck.slice(0, 3).forEach(function(ev, i) {
@@ -132,12 +56,8 @@ function renderCards() {
     if (i === 0) setupSwipe(card, ev);
   });
   positionCards();
-
-  // Precharge si moins de 5 cartes
   if (state.deck.length < 5 && !EVENTS_LOADING && !EVENTS_EXHAUSTED) {
-    loadEvents().then(function() {
-      buildDeck();
-    });
+    loadEvents().then(function() { buildDeck(); });
   }
 }
 
@@ -164,7 +84,6 @@ function createCard(ev, idx) {
         ev.distance +
       '</div>' +
     '</div>';
-
   div.addEventListener('click', function() {
     if (Math.abs(div._dragX || 0) < 5) openDetail(ev);
   });
@@ -181,7 +100,6 @@ function positionCards() {
   });
 }
 
-// ── SWIPE LOGIC ──
 function setupSwipe(card, ev) {
   var startX = 0, startY = 0, currentX = 0, isDragging = false;
   var likeLabel = card.querySelector('.swipe-label.like');
@@ -190,8 +108,7 @@ function setupSwipe(card, ev) {
   function onStart(e) {
     isDragging = true;
     var pt = e.touches ? e.touches[0] : e;
-    startX = pt.clientX;
-    startY = pt.clientY;
+    startX = pt.clientX; startY = pt.clientY;
     card.style.transition = 'none';
   }
   function onMove(e) {
@@ -200,7 +117,7 @@ function setupSwipe(card, ev) {
     var pt = e.touches ? e.touches[0] : e;
     currentX = pt.clientX - startX;
     var currentY = pt.clientY - startY;
-    card.style.transform = 'translate(' + currentX + 'px, ' + (currentY * 0.3) + 'px) rotate(' + (currentX * 0.08) + 'deg)';
+    card.style.transform = 'translate(' + currentX + 'px,' + (currentY * 0.3) + 'px) rotate(' + (currentX * 0.08) + 'deg)';
     card._dragX = currentX;
     var ratio = Math.abs(currentX) / (window.innerWidth * 0.35);
     likeLabel.style.opacity = currentX > 0 ? Math.min(ratio, 1) : 0;
@@ -213,14 +130,8 @@ function setupSwipe(card, ev) {
     var threshold = window.innerWidth * 0.35;
     if (currentX > threshold) swipeCard('like', card, ev);
     else if (currentX < -threshold) swipeCard('dislike', card, ev);
-    else {
-      card.style.transform = '';
-      likeLabel.style.opacity = 0;
-      nopeLabel.style.opacity = 0;
-      card._dragX = 0;
-    }
+    else { card.style.transform = ''; likeLabel.style.opacity = 0; nopeLabel.style.opacity = 0; card._dragX = 0; }
   }
-
   card.addEventListener('mousedown', onStart);
   card.addEventListener('mousemove', onMove);
   card.addEventListener('mouseup', onEnd);
@@ -232,37 +143,31 @@ function setupSwipe(card, ev) {
 function swipeCard(direction, card, ev) {
   var x = direction === 'like' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5;
   card.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
-  card.style.transform = 'translate(' + x + 'px, 0) rotate(' + (direction === 'like' ? 30 : -30) + 'deg)';
+  card.style.transform = 'translate(' + x + 'px,0) rotate(' + (direction === 'like' ? 30 : -30) + 'deg)';
   card.style.opacity = '0';
-
   if (direction === 'like') {
     state.liked.push(ev);
-    localStorage.setItem('outnow_likes', JSON.stringify(state.liked.map(function(e) { return e.id; })));
   } else {
     state.disliked.push(ev.id);
   }
-
   state.deck = state.deck.filter(function(e) { return e.id !== ev.id; });
-
   if (state.deck.length < 5 && !EVENTS_LOADING && !EVENTS_EXHAUSTED) {
     loadEvents().then(function() { buildDeck(); });
   }
-
   setTimeout(function() { card.remove(); renderCards(); }, 400);
 }
 
-// ── ACTION BUTTONS ──
-$('btn-like').addEventListener('click', function() {
+$('btn-like') && $('btn-like').addEventListener('click', function() {
   var top = cardStack.querySelector('.front');
   if (!top || state.deck.length === 0) return;
   swipeCard('like', top, state.deck[0]);
 });
-$('btn-dislike').addEventListener('click', function() {
+$('btn-dislike') && $('btn-dislike').addEventListener('click', function() {
   var top = cardStack.querySelector('.front');
   if (!top || state.deck.length === 0) return;
   swipeCard('dislike', top, state.deck[0]);
 });
-$('btn-super').addEventListener('click', function() {
+$('btn-super') && $('btn-super').addEventListener('click', function() {
   var top = cardStack.querySelector('.front');
   if (!top || state.deck.length === 0) return;
   var ev = state.deck[0];
@@ -274,7 +179,6 @@ $('btn-super').addEventListener('click', function() {
   setTimeout(function() { top.remove(); renderCards(); }, 400);
 });
 
-// ── CATEGORY FILTER ──
 document.querySelectorAll('.cat-pill').forEach(function(pill) {
   pill.addEventListener('click', function() {
     document.querySelectorAll('.cat-pill').forEach(function(p) { p.classList.remove('active'); });
@@ -286,13 +190,12 @@ document.querySelectorAll('.cat-pill').forEach(function(pill) {
   });
 });
 
-// ── FILTER PANEL ──
-$('btn-filter').addEventListener('click', function() {
+$('btn-filter') && $('btn-filter').addEventListener('click', function() {
   filterPanel.classList.remove('hidden');
   panelOverlay.classList.remove('hidden');
 });
-panelOverlay.addEventListener('click', closeFilter);
-$('btn-apply-filter').addEventListener('click', function() {
+panelOverlay && panelOverlay.addEventListener('click', closeFilter);
+$('btn-apply-filter') && $('btn-apply-filter').addEventListener('click', function() {
   closeFilter();
   state.deck = [];
   buildDeck();
@@ -302,7 +205,7 @@ function closeFilter() {
   filterPanel.classList.add('hidden');
   panelOverlay.classList.add('hidden');
 }
-$('filter-distance').addEventListener('input', function() {
+$('filter-distance') && $('filter-distance').addEventListener('input', function() {
   $('filter-distance-val').textContent = this.value + ' km';
   state.currentFilter.distance = parseInt(this.value);
 });
@@ -311,79 +214,46 @@ document.querySelectorAll('.budget-pill').forEach(function(p) {
     p.closest('.budget-pills').querySelectorAll('.budget-pill').forEach(function(x) { x.classList.remove('active'); });
     p.classList.add('active');
     if (p.dataset.val !== undefined) state.currentFilter.budget = parseInt(p.dataset.val);
-    if (p.dataset.when !== undefined) state.currentFilter.when = p.dataset.when;
   });
 });
 
-// ── DETAIL VIEW ──
 function openDetail(ev) {
   state.currentDetail = ev;
   var isLiked = state.liked.find(function(l) { return l.id === ev.id; });
   detailContent.innerHTML =
     '<img class="detail-hero" src="' + ev.image + '" alt="' + ev.title + '" />' +
     '<div class="detail-body">' +
-      '<div class="detail-tags">' +
-        ev.tags.map(function(t) { return '<span class="detail-tag">' + t + '</span>'; }).join('') +
-      '</div>' +
+      '<div class="detail-tags">' + ev.tags.map(function(t) { return '<span class="detail-tag">' + t + '</span>'; }).join('') + '</div>' +
       '<div class="detail-title">' + ev.title + '</div>' +
-      '<div class="detail-meta-row">' +
-        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' +
-        ev.date +
-      '</div>' +
-      '<div class="detail-meta-row">' +
-        '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>' +
-        ev.location +
-      '</div>' +
+      '<div class="detail-meta-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' + ev.date + '</div>' +
+      '<div class="detail-meta-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>' + ev.location + '</div>' +
       '<div class="detail-desc">' + ev.description + '</div>' +
       '<div class="detail-price-badge">' + ev.priceLabel + '</div>' +
       '<div class="detail-cta">' +
-        '<button class="btn-primary" onclick="reserveEvent(' + ev.id + ')">Voir les details</button>' +
-        '<button class="btn-icon" onclick="likeFromDetail(' + ev.id + ')">' +
-          '<svg width="22" height="22" viewBox="0 0 24 24" fill="' + (isLiked ? 'var(--accent)' : 'none') + '" stroke="var(--accent)" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>' +
-        '</button>' +
+        '<button class="btn-primary" onclick="likeFromDetail(' + ev.id + ')">❤️ Sauvegarder</button>' +
       '</div>' +
     '</div>';
   showScreen('detail');
 }
 
-window.reserveEvent = function(id) {
-  alert('En prod, ca redirigerait vers la page de reservation de l evenement.');
-};
 window.likeFromDetail = function(id) {
   var ev = EVENTS.find(function(e) { return e.id === id; });
-  if (!ev) return;
-  if (!state.liked.find(function(l) { return l.id === id; })) {
-    state.liked.push(ev);
-    state.deck = state.deck.filter(function(e) { return e.id !== id; });
-  }
-  openDetail(ev);
+  if (!ev || state.liked.find(function(l) { return l.id === id; })) return;
+  state.liked.push(ev);
+  state.deck = state.deck.filter(function(e) { return e.id !== id; });
+  showScreen('home');
 };
 
-$('btn-back-detail').addEventListener('click', function() { showScreen('home'); });
-$('btn-share-detail').addEventListener('click', function() {
-  if (navigator.share && state.currentDetail) {
-    navigator.share({ title: state.currentDetail.title, text: state.currentDetail.description, url: window.location.href });
-  }
-});
-
-// ── LIKES SCREEN ──
 function renderLikes() {
+  if (!likesGrid) return;
   if (state.liked.length === 0) {
-    likesGrid.innerHTML =
-      '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text2)">' +
-        '<div style="font-size:48px;margin-bottom:16px">❤️</div>' +
-        '<div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">Pas encore de likes</div>' +
-        '<div style="font-size:14px">Swipe dans Decouvrir pour sauvegarder des sorties !</div>' +
-      '</div>';
+    likesGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text2)"><div style="font-size:48px;margin-bottom:16px">❤️</div><div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">Pas encore de likes</div></div>';
     return;
   }
   likesGrid.innerHTML = state.liked.map(function(ev) {
     return '<div class="like-item" onclick="openLikeDetail(' + ev.id + ')">' +
       '<img src="' + ev.image + '" alt="' + ev.title + '" loading="lazy" />' +
-      '<div class="like-item-info">' +
-        '<div class="like-item-title">' + ev.title + '</div>' +
-        '<div class="like-item-date">' + ev.date + '</div>' +
-      '</div>' +
+      '<div class="like-item-info"><div class="like-item-title">' + ev.title + '</div><div class="like-item-date">' + ev.date + '</div></div>' +
     '</div>';
   }).join('');
 }
@@ -392,168 +262,3 @@ window.openLikeDetail = function(id) {
   var ev = EVENTS.find(function(e) { return e.id === id; });
   if (ev) openDetail(ev);
 };
-
-// ── GROUP MODE ──
-$('btn-group-mode').addEventListener('click', function() {
-  showScreen('group');
-  document.querySelectorAll('.nav-item').forEach(function(n) {
-    n.classList.toggle('active', n.dataset.screen === 'group');
-  });
-});
-$('btn-back-group').addEventListener('click', function() { showScreen('home'); });
-
-$('btn-create-group').addEventListener('click', function() {
-  var name = $('group-name-input').value.trim() || 'Mon Groupe';
-  var code = Math.random().toString(36).substring(2, 6).toUpperCase();
-  state.group = { name: name, code: code, members: ['Toi', 'Emma', 'Lucas'] };
-  state.groupDeck = JSON.parse(JSON.stringify(EVENTS));
-  state.groupLikes = {};
-  $('group-session-name').textContent = name;
-  $('group-code-display').textContent = code;
-  renderGroupMembers();
-  renderGroupCard();
-  $('group-create').classList.add('hidden');
-  $('group-session').classList.remove('hidden');
-});
-
-$('btn-join-group').addEventListener('click', function() {
-  var code = prompt('Entre le code du groupe :');
-  if (code) alert('Rejoindre le groupe "' + code.toUpperCase() + '" necessite un backend temps reel (bientot disponible !)');
-});
-
-$('btn-copy-code').addEventListener('click', function() {
-  if (state.group && navigator.clipboard) {
-    navigator.clipboard.writeText(state.group.code).then(function() {
-      $('btn-copy-code').textContent = 'Copie !';
-      setTimeout(function() { $('btn-copy-code').textContent = 'Copier'; }, 1500);
-    });
-  }
-});
-
-function renderGroupMembers() {
-  var list = $('group-members-list');
-  var emojis = ['👤', '👩', '👨'];
-  list.innerHTML = state.group.members.map(function(m, i) {
-    return '<div class="member-avatar">' +
-      '<div class="member-bubble' + (i === 0 ? ' you' : '') + '">' + (emojis[i] || '👥') + '</div>' +
-      '<div class="member-name">' + m + '</div>' +
-    '</div>';
-  }).join('');
-}
-
-function renderGroupCard() {
-  groupCardStack.innerHTML = '';
-  if (state.groupDeck.length === 0) {
-    groupCardStack.innerHTML = '<div class="card-empty"><div class="empty-emoji">✅</div><h3>Tout swipe !</h3></div>';
-    return;
-  }
-  state.groupDeck.slice(0, 2).forEach(function(ev, i) {
-    var card = createCard(ev, i);
-    groupCardStack.appendChild(card);
-    if (i === 0) setupGroupSwipe(card, ev);
-  });
-  positionGroupCards();
-}
-
-function positionGroupCards() {
-  var cards = groupCardStack.querySelectorAll('.event-card');
-  cards.forEach(function(c, i) {
-    c.classList.remove('front', 'behind', 'third');
-    if (i === 0) c.classList.add('front');
-    else c.classList.add('behind');
-  });
-}
-
-function setupGroupSwipe(card, ev) {
-  var startX = 0, currentX = 0, isDragging = false;
-  var likeLabel = card.querySelector('.swipe-label.like');
-  var nopeLabel = card.querySelector('.swipe-label.nope');
-
-  card.addEventListener('touchstart', function(e) {
-    isDragging = true; startX = e.touches[0].clientX; card.style.transition = 'none';
-  }, { passive: true });
-  card.addEventListener('touchmove', function(e) {
-    if (!isDragging) return;
-    currentX = e.touches[0].clientX - startX;
-    card.style.transform = 'translate(' + currentX + 'px, 0) rotate(' + (currentX * 0.08) + 'deg)';
-    var r = Math.abs(currentX) / (window.innerWidth * 0.35);
-    likeLabel.style.opacity = currentX > 0 ? Math.min(r, 1) : 0;
-    nopeLabel.style.opacity = currentX < 0 ? Math.min(r, 1) : 0;
-  }, { passive: false });
-  card.addEventListener('touchend', function() {
-    isDragging = false;
-    card.style.transition = 'transform 0.3s ease';
-    var threshold = window.innerWidth * 0.35;
-    if (currentX > threshold) groupSwipe('like', card, ev);
-    else if (currentX < -threshold) groupSwipe('dislike', card, ev);
-    else { card.style.transform = ''; likeLabel.style.opacity = 0; nopeLabel.style.opacity = 0; }
-  });
-  card.addEventListener('mousedown', function(e) {
-    isDragging = true; startX = e.clientX; card.style.transition = 'none';
-  });
-  card.addEventListener('mousemove', function(e) {
-    if (!isDragging) return;
-    currentX = e.clientX - startX;
-    card.style.transform = 'translate(' + currentX + 'px, 0) rotate(' + (currentX * 0.08) + 'deg)';
-    var r = Math.abs(currentX) / (window.innerWidth * 0.35);
-    likeLabel.style.opacity = currentX > 0 ? Math.min(r, 1) : 0;
-    nopeLabel.style.opacity = currentX < 0 ? Math.min(r, 1) : 0;
-  });
-  card.addEventListener('mouseup', function() {
-    isDragging = false;
-    card.style.transition = 'transform 0.3s ease';
-    var threshold = window.innerWidth * 0.35;
-    if (currentX > threshold) groupSwipe('like', card, ev);
-    else if (currentX < -threshold) groupSwipe('dislike', card, ev);
-    else { card.style.transform = ''; likeLabel.style.opacity = 0; nopeLabel.style.opacity = 0; }
-  });
-}
-
-function groupSwipe(direction, card, ev) {
-  var x = direction === 'like' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5;
-  card.style.transform = 'translate(' + x + 'px, 0) rotate(' + (direction === 'like' ? 30 : -30) + 'deg)';
-  card.style.opacity = '0';
-  if (direction === 'like') {
-    var membersLiked = Math.random() > 0.4;
-    if (membersLiked) {
-      setTimeout(function() { showMatchModal(ev); }, 600);
-      addGroupMatch(ev);
-    }
-  }
-  state.groupDeck = state.groupDeck.filter(function(e) { return e.id !== ev.id; });
-  setTimeout(function() { card.remove(); renderGroupCard(); }, 400);
-}
-
-$('grp-btn-like').addEventListener('click', function() {
-  var top = groupCardStack.querySelector('.front');
-  if (!top || state.groupDeck.length === 0) return;
-  groupSwipe('like', top, state.groupDeck[0]);
-});
-$('grp-btn-dislike').addEventListener('click', function() {
-  var top = groupCardStack.querySelector('.front');
-  if (!top || state.groupDeck.length === 0) return;
-  groupSwipe('dislike', top, state.groupDeck[0]);
-});
-
-function showMatchModal(ev) {
-  $('match-event-name').textContent = ev.title;
-  $('match-modal').classList.remove('hidden');
-}
-$('btn-match-ok').addEventListener('click', function() {
-  $('match-modal').classList.add('hidden');
-});
-
-function addGroupMatch(ev) {
-  var list = $('matches-list');
-  var item = document.createElement('div');
-  item.className = 'match-card';
-  item.innerHTML =
-    '<img class="match-card-img" src="' + ev.image + '" alt="' + ev.title + '" />' +
-    '<div class="match-card-info">' +
-      '<div class="match-card-title">' + ev.title + '</div>' +
-      '<div class="match-card-sub">' + ev.date + ' · ' + ev.distance + '</div>' +
-    '</div>' +
-    '<div class="match-badge">Match !</div>';
-  list.prepend(item);
-  $('matches-section').style.display = 'block';
-}
