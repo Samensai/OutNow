@@ -1,14 +1,23 @@
 var EVENTS = [];
+var EVENTS_PAGE = 0;
+var EVENTS_LOADING = false;
+var EVENTS_EXHAUSTED = false;
 
-var OPENAGENDA_KEY = "6cf33cc591df40a9b0fac2a946d4c3ec";
-
+var OPENAGENDA_KEY = "TA_CLE_ICI";
 var AGENDA_UIDS = [61665301, 52870970];
+var SEEN_IDS = {};
 
 function loadEvents() {
+  if (EVENTS_LOADING || EVENTS_EXHAUSTED) return Promise.resolve();
+  EVENTS_LOADING = true;
+
+  var after = EVENTS_PAGE * 20;
+
   var promises = AGENDA_UIDS.map(function(uid) {
     var url = "https://api.openagenda.com/v2/agendas/" + uid + "/events"
       + "?key=" + OPENAGENDA_KEY
-      + "&size=15"
+      + "&size=20"
+      + "&from=" + after
       + "&lang=fr"
       + "&relative[]=current"
       + "&relative[]=upcoming";
@@ -22,71 +31,71 @@ function loadEvents() {
     var all = [];
     results.forEach(function(evts) { all = all.concat(evts); });
 
-    if (all.length === 0) {
-      console.warn("Aucun evenement recu, verifiez votre cle API.");
-      return;
+    var newEvents = all.filter(function(e) {
+      if (SEEN_IDS[e.uid]) return false;
+      SEEN_IDS[e.uid] = true;
+      return true;
+    }).map(function(e, i) {
+      var title = (e.title && (e.title.fr || e.title.en)) || "Evenement";
+      var desc = (e.description && (e.description.fr || e.description.en)) || "";
+      var loc = (e.location && (e.location.name || e.location.city)) || "Paris";
+      var city = (e.location && e.location.city) || "";
+
+      var image = fallbackImage(Object.keys(SEEN_IDS).length + i);
+      if (e.image && e.image.base && e.image.filename) {
+        image = e.image.base + e.image.filename;
+      }
+
+      var price = 0;
+      var priceLabel = "Gratuit";
+      if (e.registration && e.registration.length > 0) {
+        price = 10;
+        priceLabel = "Payant";
+      }
+
+      var dateStr = "Prochainement";
+      var timing = e.firstTiming || e.nextTiming || e.lastTiming;
+      if (timing && timing.begin) {
+        var d = new Date(timing.begin);
+        dateStr = d.toLocaleDateString("fr-FR", {
+          weekday: "long", day: "numeric", month: "long",
+          hour: "2-digit", minute: "2-digit"
+        });
+      }
+
+      var keywords = [];
+      if (e.keywords && e.keywords.fr) {
+        keywords = Array.isArray(e.keywords.fr) ? e.keywords.fr : [e.keywords.fr];
+      }
+      var cat = detectCategory(keywords, title);
+      var tags = keywords.slice(0, 3);
+      if (tags.length === 0) tags = [cat];
+
+      return {
+        id: e.uid || (Date.now() + i),
+        title: title,
+        category: cat,
+        tags: tags,
+        date: dateStr,
+        location: loc + (city && loc !== city ? ", " + city : ""),
+        distance: "Paris",
+        price: price,
+        priceLabel: priceLabel,
+        image: image,
+        description: desc,
+        liked: false
+      };
+    });
+
+    if (newEvents.length === 0) {
+      EVENTS_EXHAUSTED = true;
+    } else {
+      EVENTS = EVENTS.concat(newEvents);
+      EVENTS_PAGE++;
     }
 
-    var seen = {};
-    EVENTS = all
-      .filter(function(e) {
-        if (seen[e.uid]) return false;
-        seen[e.uid] = true;
-        return true;
-      })
-      .map(function(e, i) {
-        var title = (e.title && (e.title.fr || e.title.en)) || "Evenement";
-        var desc = (e.description && (e.description.fr || e.description.en)) || "";
-        var loc = (e.location && (e.location.name || e.location.city)) || "Paris";
-        var city = (e.location && e.location.city) || "Paris";
-
-        var image = fallbackImage(i);
-        if (e.image && e.image.base && e.image.filename) {
-          image = e.image.base + e.image.filename;
-        }
-
-        var price = 0;
-        var priceLabel = "Gratuit";
-        if (e.registration && e.registration.length > 0) {
-          price = 10;
-          priceLabel = "Payant";
-        }
-
-        var dateStr = "Prochainement";
-        var timing = e.firstTiming || e.nextTiming || e.lastTiming;
-        if (timing && timing.begin) {
-          var d = new Date(timing.begin);
-          dateStr = d.toLocaleDateString("fr-FR", {
-            weekday: "long", day: "numeric", month: "long",
-            hour: "2-digit", minute: "2-digit"
-          });
-        }
-
-        var keywords = [];
-        if (e.keywords && e.keywords.fr) {
-          keywords = Array.isArray(e.keywords.fr) ? e.keywords.fr : [e.keywords.fr];
-        }
-        var cat = detectCategory(keywords, title);
-        var tags = keywords.slice(0, 3);
-        if (tags.length === 0) tags = [cat];
-
-        return {
-          id: e.uid || i,
-          title: title,
-          category: cat,
-          tags: tags,
-          date: dateStr,
-          location: loc + (city ? ", " + city : ""),
-          distance: "Paris",
-          price: price,
-          priceLabel: priceLabel,
-          image: image,
-          description: desc,
-          liked: false
-        };
-      });
-
-    console.log("OutNow: " + EVENTS.length + " evenements charges.");
+    EVENTS_LOADING = false;
+    console.log("OutNow: " + EVENTS.length + " evenements charges au total.");
   });
 }
 
