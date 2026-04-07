@@ -32,6 +32,7 @@ window.addEventListener('load', () => {
     const onboarded = localStorage.getItem('outnow_onboarded');
     if (onboarded) {
       showScreen('home');
+      await loadEvents();
       buildDeck();
       renderCards();
     } else {
