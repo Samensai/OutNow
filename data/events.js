@@ -1,29 +1,46 @@
 var EVENTS = [];
-var EVENTS_PAGE = 0;
 var EVENTS_LOADING = false;
 var EVENTS_EXHAUSTED = false;
+var SEEN_IDS = {};
 
 var OPENAGENDA_KEY = "6cf33cc591df40a9b0fac2a946d4c3ec";
 var AGENDA_UIDS = [61665301, 52870970];
-var SEEN_IDS = {};
+
+// Curseurs par agenda
+var CURSORS = {};
+AGENDA_UIDS.forEach(function(uid) { CURSORS[uid] = null; });
 
 function loadEvents() {
   if (EVENTS_LOADING || EVENTS_EXHAUSTED) return Promise.resolve();
   EVENTS_LOADING = true;
 
-  var after = EVENTS_PAGE * 20;
-
   var promises = AGENDA_UIDS.map(function(uid) {
+    if (CURSORS[uid] === 'done') return Promise.resolve([]);
+
     var url = "https://api.openagenda.com/v2/agendas/" + uid + "/events"
       + "?key=" + OPENAGENDA_KEY
       + "&size=20"
-      + "&from=" + after
       + "&lang=fr"
       + "&relative[]=current"
       + "&relative[]=upcoming";
+
+    if (CURSORS[uid]) {
+      var cursor = CURSORS[uid];
+      cursor.forEach(function(val) {
+        url += "&after[]=" + encodeURIComponent(val);
+      });
+    }
+
     return fetch(url)
       .then(function(res) { return res.json(); })
-      .then(function(data) { return data.events || []; })
+      .then(function(data) {
+        if (data.after && data.after.length > 0) {
+          CURSORS[uid] = data.after;
+        } else {
+          CURSORS[uid] = 'done';
+        }
+        return data.events || [];
+      })
       .catch(function() { return []; });
   });
 
@@ -77,7 +94,7 @@ function loadEvents() {
         category: cat,
         tags: tags,
         date: dateStr,
-        location: loc + (city && loc !== city ? ", " + city : ""),
+        location: loc + (city && loc.indexOf(city) === -1 ? ", " + city : ""),
         distance: "Paris",
         price: price,
         priceLabel: priceLabel,
@@ -87,15 +104,13 @@ function loadEvents() {
       };
     });
 
-    if (newEvents.length === 0) {
-      EVENTS_EXHAUSTED = true;
-    } else {
-      EVENTS = EVENTS.concat(newEvents);
-      EVENTS_PAGE++;
-    }
+    EVENTS = EVENTS.concat(newEvents);
+
+    var allDone = AGENDA_UIDS.every(function(uid) { return CURSORS[uid] === 'done'; });
+    if (allDone && newEvents.length === 0) EVENTS_EXHAUSTED = true;
 
     EVENTS_LOADING = false;
-    console.log("OutNow: " + EVENTS.length + " evenements charges au total.");
+    console.log("OutNow: " + EVENTS.length + " evenements charges.");
   });
 }
 
