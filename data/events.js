@@ -4,29 +4,38 @@ var EVENTS_EXHAUSTED = false;
 var SEEN_IDS = {};
 
 var OPENAGENDA_KEY = "6cf33cc591df40a9b0fac2a946d4c3ec";
-var AGENDA_UIDS = [61665301, 52870970];
+var TODAY = new Date().toISOString().split('T')[0];
 
-// Curseurs par agenda
-var CURSORS = {};
-AGENDA_UIDS.forEach(function(uid) { CURSORS[uid] = null; });
+var AGENDAS = [
+  { uid: 61665301, cursor: null, done: false },
+  { uid: 52870970, cursor: null, done: false },
+  { uid: 85121895, cursor: null, done: false },
+  { uid: 14898606, cursor: null, done: false },
+  { uid: 20272888, cursor: null, done: false },
+  { uid: 39308038, cursor: null, done: false }
+];
 
 function loadEvents() {
   if (EVENTS_LOADING || EVENTS_EXHAUSTED) return Promise.resolve();
   EVENTS_LOADING = true;
 
-  var promises = AGENDA_UIDS.map(function(uid) {
-    if (CURSORS[uid] === 'done') return Promise.resolve([]);
+  var activeAgendas = AGENDAS.filter(function(a) { return !a.done; });
 
-    var url = "https://api.openagenda.com/v2/agendas/" + uid + "/events"
+  if (activeAgendas.length === 0) {
+    EVENTS_EXHAUSTED = true;
+    EVENTS_LOADING = false;
+    return Promise.resolve();
+  }
+
+  var promises = activeAgendas.map(function(agenda) {
+    var url = "https://api.openagenda.com/v2/agendas/" + agenda.uid + "/events"
       + "?key=" + OPENAGENDA_KEY
       + "&size=20"
       + "&lang=fr"
-      + "&relative[]=current"
-      + "&relative[]=upcoming";
+      + "&timings[gte]=" + TODAY;
 
-    if (CURSORS[uid]) {
-      var cursor = CURSORS[uid];
-      cursor.forEach(function(val) {
+    if (agenda.cursor) {
+      agenda.cursor.forEach(function(val) {
         url += "&after[]=" + encodeURIComponent(val);
       });
     }
@@ -35,13 +44,16 @@ function loadEvents() {
       .then(function(res) { return res.json(); })
       .then(function(data) {
         if (data.after && data.after.length > 0) {
-          CURSORS[uid] = data.after;
+          agenda.cursor = data.after;
         } else {
-          CURSORS[uid] = 'done';
+          agenda.done = true;
         }
         return data.events || [];
       })
-      .catch(function() { return []; });
+      .catch(function() {
+        agenda.done = true;
+        return [];
+      });
   });
 
   return Promise.all(promises).then(function(results) {
@@ -106,8 +118,8 @@ function loadEvents() {
 
     EVENTS = EVENTS.concat(newEvents);
 
-    var allDone = AGENDA_UIDS.every(function(uid) { return CURSORS[uid] === 'done'; });
-    if (allDone && newEvents.length === 0) EVENTS_EXHAUSTED = true;
+    var allDone = AGENDAS.every(function(a) { return a.done; });
+    if (allDone) EVENTS_EXHAUSTED = true;
 
     EVENTS_LOADING = false;
     console.log("OutNow: " + EVENTS.length + " evenements charges.");
