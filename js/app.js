@@ -206,18 +206,26 @@ function setupSwipe(card, ev) {
 }
 
 function swipeCard(direction, card, ev) {
-  const x = direction === 'like' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5;
+  var x = direction === 'like' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5;
   card.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
   card.style.transform = 'translate(' + x + 'px, 0) rotate(' + (direction === 'like' ? 30 : -30) + 'deg)';
   card.style.opacity = '0';
   if (direction === 'like') {
     state.liked.push(ev);
-    localStorage.setItem('outnow_likes', JSON.stringify(state.liked.map(e => e.id)));
+    localStorage.setItem('outnow_likes', JSON.stringify(state.liked.map(function(e) { return e.id; })));
   }
-  state.deck = state.deck.filter(e => e.id !== ev.id);
-  setTimeout(() => { card.remove(); renderCards(); }, 400);
-}
+  state.deck = state.deck.filter(function(e) { return e.id !== ev.id; });
 
+  // Recharge si moins de 5 cartes restantes
+  if (state.deck.length < 5 && !EVENTS_LOADING && !EVENTS_EXHAUSTED) {
+    loadEvents().then(function() {
+      state.events = JSON.parse(JSON.stringify(EVENTS));
+      buildDeck();
+    });
+  }
+
+  setTimeout(function() { card.remove(); renderCards(); }, 400);
+}
 // ── ACTION BUTTONS ──
 $('btn-like').addEventListener('click', () => {
   const top = cardStack.querySelector('.front');
