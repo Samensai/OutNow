@@ -2,7 +2,7 @@
 
 // ── STATE ──
 const state = {
-  events: JSON.parse(JSON.stringify(EVENTS)), // clone
+  events: JSON.parse(JSON.stringify(EVENTS)),
   deck: [],
   currentFilter: { cat: 'all', distance: 15, budget: 999, when: 'today' },
   liked: [],
