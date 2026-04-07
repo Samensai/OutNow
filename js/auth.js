@@ -137,7 +137,7 @@ document.getElementById('btn-register').addEventListener('click', function() {
   sb.from('profiles').select('id').eq('username', username).single()
     .then(function(res) {
       if (res.data) throw new Error('Ce pseudo est deja pris.');
-      return sb.auth.signUp({ email: email, password: password });
+      return sb.auth.signUp({ email: email, password: password, options: {data: { username: username }}});
     })
     .then(function(res) {
       if (res.error) throw res.error;
