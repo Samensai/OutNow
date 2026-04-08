@@ -8,9 +8,7 @@ var messagesSubscription = null;
 var swipesSubscription = null;
 
 function loadUserGroups() {
-  if (!currentUser) { console.log('loadUserGroups: pas de user'); return; }
-  console.log('loadUserGroups pour user:', currentUser.id);
-
+  if (!currentUser) return;
   var el = document.getElementById('my-groups-list');
   if (el) el.innerHTML = '<div class="empty-state">Chargement...</div>';
 
@@ -18,29 +16,16 @@ function loadUserGroups() {
     .select('group_id')
     .eq('user_id', currentUser.id)
     .then(function(res) {
-      console.log('group_members result:', JSON.stringify(res));
-      if (res.error) {
-        console.error('Erreur group_members:', res.error);
-        if (el) el.innerHTML = '<div class="empty-state">Erreur: ' + res.error.message + '</div>';
-        return;
-      }
-      if (!res.data || res.data.length === 0) {
-        console.log('Aucun groupe trouve');
+      if (res.error || !res.data || res.data.length === 0) {
         renderGroupList([]);
         return;
       }
       var groupIds = res.data.map(function(r) { return r.group_id; });
-      console.log('groupIds trouves:', groupIds);
-
       sb.from('groups')
         .select('id, name, created_by')
         .in('id', groupIds)
         .then(function(res2) {
-          console.log('groups result:', JSON.stringify(res2));
-          if (res2.error) {
-            console.error('Erreur groups:', res2.error);
-            return;
-          }
+          if (res2.error) { renderGroupList([]); return; }
           renderGroupList(res2.data || []);
         });
     });
@@ -54,43 +39,46 @@ function renderGroupList(groups) {
     return;
   }
   el.innerHTML = groups.map(function(g) {
-    return '<div class="group-list-item" onclick="openGroup(\'' + g.id + '\', \'' + g.name + '\')">' +
+    return '<div class="group-list-item" data-gid="' + g.id + '" data-gname="' + g.name + '">' +
       '<div class="group-list-icon">👥</div>' +
       '<div class="group-list-name">' + g.name + '</div>' +
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>' +
     '</div>';
   }).join('');
+
+  el.querySelectorAll('.group-list-item').forEach(function(item) {
+    item.addEventListener('click', function() {
+      openGroup(item.dataset.gid, item.dataset.gname);
+    });
+  });
 }
 
 function createGroup(name, memberIds) {
   if (!currentUser || !name) return;
-  console.log('createGroup:', name, memberIds);
 
   sb.from('groups')
     .insert({ name: name, created_by: currentUser.id })
     .select()
     .single()
     .then(function(res) {
-      console.log('group created:', JSON.stringify(res));
       if (res.error) throw res.error;
       var groupId = res.data.id;
-      var allMembers = [currentUser.id].concat(memberIds.filter(function(id) { return id !== currentUser.id; }));
+      var allMembers = [currentUser.id].concat(
+        memberIds.filter(function(id) { return id !== currentUser.id; })
+      );
       var inserts = allMembers.map(function(uid) {
         return { group_id: groupId, user_id: uid };
       });
-      console.log('inserting members:', inserts);
       return sb.from('group_members').insert(inserts).then(function(res2) {
-        console.log('members inserted:', JSON.stringify(res2));
         if (res2.error) throw res2.error;
-        return { groupId: groupId };
+        return groupId;
       });
     })
-    .then(function(result) {
+    .then(function(groupId) {
       loadUserGroups();
-      openGroup(result.groupId, name);
+      openGroup(groupId, name);
     })
     .catch(function(err) {
-      console.error('createGroup error:', err);
       alert('Erreur creation groupe: ' + err.message);
     });
 }
@@ -113,20 +101,20 @@ function loadGroupMembers(groupId) {
     .select('user_id, profiles(id, username)')
     .eq('group_id', groupId)
     .then(function(res) {
-      if (res.error) { console.error('loadGroupMembers:', res.error); return; }
+      if (res.error) return;
       var members = (res.data || []).map(function(r) { return r.profiles; }).filter(Boolean);
-      renderGroupMembersBar(members);
+      var el = document.getElementById('group-members-bar');
+      if (!el) return;
+      el.innerHTML = members.map(function(m) {
+        return '<div class="member-chip">' +
+          m.username.charAt(0).toUpperCase() +
+          '<span>' + m.username + '</span>' +
+        '</div>';
+      }).join('');
     });
 }
 
-function renderGroupMembersBar(members) {
-  var el = document.getElementById('group-members-bar');
-  if (!el) return;
-  el.innerHTML = members.map(function(m) {
-    return '<div class="member-chip">' + m.username.charAt(0).toUpperCase() + '<span>' + m.username + '</span></div>';
-  }).join('');
-}
-
+// ── CHAT ──
 function loadGroupMessages(groupId) {
   sb.from('group_messages')
     .select('*, profiles(username)')
@@ -134,14 +122,14 @@ function loadGroupMessages(groupId) {
     .order('created_at', { ascending: true })
     .limit(50)
     .then(function(res) {
-      if (res.error) { console.error('loadGroupMessages:', res.error); return; }
+      if (res.error) return;
       groupMessages = res.data || [];
       renderMessages();
     });
 }
 
 function sendMessage(content) {
-  if (!content || !content.trim() || !currentGroup) return;
+  if (!content || !content.trim() || !currentGroup || !currentUser) return;
   sb.from('group_messages').insert({
     group_id: currentGroup.id,
     user_id: currentUser.id,
@@ -155,7 +143,7 @@ function renderMessages() {
   var el = document.getElementById('chat-messages');
   if (!el) return;
   if (groupMessages.length === 0) {
-    el.innerHTML = '<div class="empty-state" style="margin-top:40px">Pas encore de messages. Dites bonjour !</div>';
+    el.innerHTML = '<div class="empty-state" style="margin-top:40px">Pas encore de messages !</div>';
     return;
   }
   el.innerHTML = groupMessages.map(function(m) {
@@ -196,36 +184,38 @@ function subscribeToGroup(groupId) {
     .subscribe();
 }
 
+// ── SWIPE ──
 function loadGroupSwipes(groupId) {
   sb.from('group_swipes')
     .select('*')
     .eq('group_id', groupId)
     .then(function(res) {
-      if (res.error) { console.error('loadGroupSwipes:', res.error); return; }
+      if (res.error) return;
       groupSwipes = {};
       (res.data || []).forEach(function(s) {
         if (!groupSwipes[s.event_id]) groupSwipes[s.event_id] = [];
         groupSwipes[s.event_id].push(s);
       });
-      if (groupTab === 'matches') renderGroupMatches();
       if (groupTab === 'swipe') renderGroupSwipeDeck();
+      if (groupTab === 'matches') renderGroupMatches();
     });
 }
 
 function groupSwipeEvent(eventId, direction) {
   if (!currentGroup || !currentUser) return;
+  // Enregistre localement immédiatement pour eviter la répétition
+  var eid = String(eventId);
+  if (!groupSwipes[eid]) groupSwipes[eid] = [];
+  groupSwipes[eid].push({ user_id: currentUser.id, direction: direction, event_id: eid });
+
   sb.from('group_swipes').insert({
     group_id: currentGroup.id,
     user_id: currentUser.id,
-    event_id: String(eventId),
+    event_id: eid,
     direction: direction
   }).then(function(res) {
     if (res.error && res.error.code !== '23505') console.error('groupSwipeEvent:', res.error);
-    if (direction === 'like') {
-      if (!groupSwipes[String(eventId)]) groupSwipes[String(eventId)] = [];
-      groupSwipes[String(eventId)].push({ user_id: currentUser.id, direction: 'like', event_id: String(eventId) });
-      checkForMatch(String(eventId));
-    }
+    if (direction === 'like') checkForMatch(eid);
   });
 }
 
@@ -252,6 +242,7 @@ function renderGroupSwipeDeck() {
   var stack = document.getElementById('group-swipe-stack');
   if (!stack) return;
 
+  // Tous les event_ids deja swipes par moi
   var mySwipedIds = Object.keys(groupSwipes).filter(function(eid) {
     return (groupSwipes[eid] || []).find(function(s) { return s.user_id === currentUser.id; });
   });
@@ -313,7 +304,9 @@ function setupGroupCardSwipe(card, ev) {
     else if (currentX < -threshold) doSwipe('dislike');
     else { card.style.transform = ''; likeLabel.style.opacity = 0; nopeLabel.style.opacity = 0; }
   });
-  card.addEventListener('mousedown', function(e) { isDragging = true; startX = e.clientX; card.style.transition = 'none'; });
+  card.addEventListener('mousedown', function(e) {
+    isDragging = true; startX = e.clientX; card.style.transition = 'none';
+  });
   card.addEventListener('mousemove', function(e) {
     if (!isDragging) return;
     currentX = e.clientX - startX;
@@ -336,6 +329,7 @@ function setupGroupCardSwipe(card, ev) {
   if (dislikeBtn) dislikeBtn.onclick = function() { doSwipe('dislike'); };
 }
 
+// ── MATCHES ──
 function renderGroupMatches() {
   var el = document.getElementById('group-matches-list');
   if (!el || !currentGroup) return;
@@ -351,12 +345,14 @@ function renderGroupMatches() {
           if (ev) matches.push(ev);
         }
       });
+
       if (matches.length === 0) {
         el.innerHTML = '<div class="empty-state">Pas encore de match ! Swipez ensemble.</div>';
         return;
       }
+
       el.innerHTML = matches.map(function(ev) {
-        return '<div class="match-card">' +
+        return '<div class="match-card" data-evid="' + ev.id + '">' +
           '<img class="match-card-img" src="' + ev.image + '" alt="' + ev.title + '" />' +
           '<div class="match-card-info">' +
             '<div class="match-card-title">' + ev.title + '</div>' +
@@ -365,9 +361,19 @@ function renderGroupMatches() {
           '<div class="match-badge">Match !</div>' +
         '</div>';
       }).join('');
+
+      el.querySelectorAll('.match-card').forEach(function(card) {
+        card.style.cursor = 'pointer';
+        card.addEventListener('click', function() {
+          var evId = card.dataset.evid;
+          var ev = EVENTS.find(function(e) { return String(e.id) === evId; });
+          if (ev) openDetail(ev);
+        });
+      });
     });
 }
 
+// ── TABS ──
 function switchGroupTab(tab) {
   groupTab = tab;
   document.querySelectorAll('.group-tab-btn').forEach(function(b) {
