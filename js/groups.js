@@ -11,12 +11,21 @@ var swipesSubscription = null;
 function loadUserGroups() {
   if (!currentUser) return;
   sb.from('group_members')
-    .select('group_id, groups(id, name, created_by)')
+    .select('group_id')
     .eq('user_id', currentUser.id)
     .then(function(res) {
-      if (res.error) return;
-      var groups = (res.data || []).map(function(r) { return r.groups; });
-      renderGroupList(groups);
+      if (res.error || !res.data || res.data.length === 0) {
+        renderGroupList([]);
+        return;
+      }
+      var groupIds = res.data.map(function(r) { return r.group_id; });
+      return sb.from('groups')
+        .select('id, name, created_by')
+        .in('id', groupIds)
+        .then(function(res2) {
+          if (res2.error) return;
+          renderGroupList(res2.data || []);
+        });
     });
 }
 
