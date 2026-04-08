@@ -147,6 +147,7 @@ function swipeCard(direction, card, ev) {
   card.style.opacity = '0';
   if (direction === 'like') {
     state.liked.push(ev);
+    localStorage.setItem('outnow_liked_events', JSON.stringify(state.liked));
   } else {
     state.disliked.push(ev.id);
   }
