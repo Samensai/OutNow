@@ -251,10 +251,22 @@ function renderLikes() {
     likesGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text2)"><div style="font-size:48px;margin-bottom:16px">❤️</div><div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">Pas encore de likes</div></div>';
     return;
   }
+  var now = new Date();
   likesGrid.innerHTML = state.liked.map(function(ev) {
+    var isPast = false;
+    if (ev.firstTiming && ev.firstTiming.end) {
+      isPast = new Date(ev.firstTiming.end) < now;
+    } else if (ev.date && ev.date !== 'Prochainement') {
+      // Essaie de parser la date affichée
+      isPast = false; // difficile à parser, on laisse false par défaut
+    }
     return '<div class="like-item" onclick="openLikeDetail(' + ev.id + ')">' +
       '<img src="' + ev.image + '" alt="' + ev.title + '" loading="lazy" />' +
-      '<div class="like-item-info"><div class="like-item-title">' + ev.title + '</div><div class="like-item-date">' + ev.date + '</div></div>' +
+      (isPast ? '<div class="like-past-badge">Passe</div>' : '') +
+      '<div class="like-item-info">' +
+        '<div class="like-item-title">' + ev.title + '</div>' +
+        '<div class="like-item-date">' + ev.date + '</div>' +
+      '</div>' +
     '</div>';
   }).join('');
 }
