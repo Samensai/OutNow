@@ -30,12 +30,12 @@ function hideAuthScreen() {
   document.getElementById('bottom-nav-wrap').classList.remove('hidden');
 }
 
+var appStarted = false;
 function startApp() {
+  if (appStarted) return;
+  appStarted = true;
   showScreen('home');
-  loadEvents().then(function() {
-    buildDeck();
-    renderCards();
-  });
+  loadEvents().then(function() { buildDeck(); renderCards(); });
   updateProfileUI();
 }
 
