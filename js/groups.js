@@ -84,6 +84,7 @@ function createGroup(name, memberIds) {
 }
 
 function openGroup(groupId, groupName) {
+  if (pollingInterval) clearInterval(pollingInterval);
   currentGroup = { id: groupId, name: groupName };
   document.getElementById('group-detail-name').textContent = groupName;
   groupSwipes = {};
@@ -157,10 +158,14 @@ function renderMessages() {
   el.scrollTop = el.scrollHeight;
 }
 
+var pollingInterval = null;
+
 function subscribeToGroup(groupId) {
   if (messagesSubscription) { try { messagesSubscription.unsubscribe(); } catch(e) {} }
   if (swipesSubscription) { try { swipesSubscription.unsubscribe(); } catch(e) {} }
+  if (pollingInterval) clearInterval(pollingInterval);
 
+  // Essaie les websockets
   messagesSubscription = sb.channel('msg-' + groupId)
     .on('postgres_changes', {
       event: 'INSERT', schema: 'public', table: 'group_messages',
@@ -182,6 +187,13 @@ function subscribeToGroup(groupId) {
       if (groupTab === 'matches') renderGroupMatches();
     })
     .subscribe();
+
+  // Polling fallback toutes les 3 secondes
+  pollingInterval = setInterval(function() {
+    if (!currentGroup) { clearInterval(pollingInterval); return; }
+    loadGroupMessages(currentGroup.id);
+    loadGroupSwipes(currentGroup.id);
+  }, 3000);
 }
 
 // ── SWIPE ──
