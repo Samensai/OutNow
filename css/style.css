@@ -493,5 +493,9 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px;
 .friend-pick-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; color: var(--text); font-size: 14px; cursor: pointer; }
 .friend-pick-item input { accent-color: var(--accent); width: 18px; height: 18px; }
 
+#screen-group-detail .chat-input-bar {
+  margin-bottom: calc(60px + var(--safe-bottom));
+}
+
 /* ── UTILS ── */
 .hidden { display: none !important; }
