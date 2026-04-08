@@ -191,8 +191,11 @@ function subscribeToGroup(groupId) {
   // Polling fallback toutes les 3 secondes
   pollingInterval = setInterval(function() {
     if (!currentGroup) { clearInterval(pollingInterval); return; }
-    loadGroupMessages(currentGroup.id);
-    loadGroupSwipes(currentGroup.id);
+    if (groupTab === 'chat') {
+      loadGroupMessages(currentGroup.id);
+    } else if (groupTab === 'matches') {
+      loadGroupSwipes(currentGroup.id);
+    }
   }, 3000);
 }
 
