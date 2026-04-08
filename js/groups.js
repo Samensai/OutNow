@@ -7,23 +7,40 @@ var groupTab = 'chat';
 var messagesSubscription = null;
 var swipesSubscription = null;
 
-// ── LISTE DES GROUPES ──
 function loadUserGroups() {
-  if (!currentUser) return;
+  if (!currentUser) { console.log('loadUserGroups: pas de user'); return; }
+  console.log('loadUserGroups pour user:', currentUser.id);
+
+  var el = document.getElementById('my-groups-list');
+  if (el) el.innerHTML = '<div class="empty-state">Chargement...</div>';
+
   sb.from('group_members')
     .select('group_id')
     .eq('user_id', currentUser.id)
     .then(function(res) {
-      if (res.error || !res.data || res.data.length === 0) {
+      console.log('group_members result:', JSON.stringify(res));
+      if (res.error) {
+        console.error('Erreur group_members:', res.error);
+        if (el) el.innerHTML = '<div class="empty-state">Erreur: ' + res.error.message + '</div>';
+        return;
+      }
+      if (!res.data || res.data.length === 0) {
+        console.log('Aucun groupe trouve');
         renderGroupList([]);
         return;
       }
       var groupIds = res.data.map(function(r) { return r.group_id; });
-      return sb.from('groups')
+      console.log('groupIds trouves:', groupIds);
+
+      sb.from('groups')
         .select('id, name, created_by')
         .in('id', groupIds)
         .then(function(res2) {
-          if (res2.error) return;
+          console.log('groups result:', JSON.stringify(res2));
+          if (res2.error) {
+            console.error('Erreur groups:', res2.error);
+            return;
+          }
           renderGroupList(res2.data || []);
         });
     });
@@ -33,7 +50,7 @@ function renderGroupList(groups) {
   var el = document.getElementById('my-groups-list');
   if (!el) return;
   if (groups.length === 0) {
-    el.innerHTML = '<div class="empty-state">Pas encore de groupe. Crées-en un !</div>';
+    el.innerHTML = '<div class="empty-state">Pas encore de groupe. Crees-en un !</div>';
     return;
   }
   el.innerHTML = groups.map(function(g) {
@@ -45,31 +62,44 @@ function renderGroupList(groups) {
   }).join('');
 }
 
-// ── CRÉER UN GROUPE ──
 function createGroup(name, memberIds) {
   if (!currentUser || !name) return;
-  var groupId;
-  sb.from('groups').insert({ name: name, created_by: currentUser.id }).select().single()
+  console.log('createGroup:', name, memberIds);
+
+  sb.from('groups')
+    .insert({ name: name, created_by: currentUser.id })
+    .select()
+    .single()
     .then(function(res) {
+      console.log('group created:', JSON.stringify(res));
       if (res.error) throw res.error;
-      groupId = res.data.id;
-      var members = memberIds.concat([currentUser.id]);
-      var inserts = members.map(function(uid) {
+      var groupId = res.data.id;
+      var allMembers = [currentUser.id].concat(memberIds.filter(function(id) { return id !== currentUser.id; }));
+      var inserts = allMembers.map(function(uid) {
         return { group_id: groupId, user_id: uid };
       });
-      return sb.from('group_members').insert(inserts);
+      console.log('inserting members:', inserts);
+      return sb.from('group_members').insert(inserts).then(function(res2) {
+        console.log('members inserted:', JSON.stringify(res2));
+        if (res2.error) throw res2.error;
+        return { groupId: groupId };
+      });
     })
-    .then(function() {
+    .then(function(result) {
       loadUserGroups();
-      openGroup(groupId, name);
+      openGroup(result.groupId, name);
     })
-    .catch(function(err) { alert('Erreur: ' + err.message); });
+    .catch(function(err) {
+      console.error('createGroup error:', err);
+      alert('Erreur creation groupe: ' + err.message);
+    });
 }
 
-// ── OUVRIR UN GROUPE ──
 function openGroup(groupId, groupName) {
   currentGroup = { id: groupId, name: groupName };
   document.getElementById('group-detail-name').textContent = groupName;
+  groupSwipes = {};
+  groupMessages = [];
   switchGroupTab('chat');
   loadGroupMembers(groupId);
   loadGroupMessages(groupId);
@@ -83,13 +113,13 @@ function loadGroupMembers(groupId) {
     .select('user_id, profiles(id, username)')
     .eq('group_id', groupId)
     .then(function(res) {
-      if (res.error) return;
-      var members = (res.data || []).map(function(r) { return r.profiles; });
-      renderGroupMembers(members);
+      if (res.error) { console.error('loadGroupMembers:', res.error); return; }
+      var members = (res.data || []).map(function(r) { return r.profiles; }).filter(Boolean);
+      renderGroupMembersBar(members);
     });
 }
 
-function renderGroupMembers(members) {
+function renderGroupMembersBar(members) {
   var el = document.getElementById('group-members-bar');
   if (!el) return;
   el.innerHTML = members.map(function(m) {
@@ -97,7 +127,6 @@ function renderGroupMembers(members) {
   }).join('');
 }
 
-// ── CHAT ──
 function loadGroupMessages(groupId) {
   sb.from('group_messages')
     .select('*, profiles(username)')
@@ -105,30 +134,35 @@ function loadGroupMessages(groupId) {
     .order('created_at', { ascending: true })
     .limit(50)
     .then(function(res) {
-      if (res.error) return;
+      if (res.error) { console.error('loadGroupMessages:', res.error); return; }
       groupMessages = res.data || [];
       renderMessages();
     });
 }
 
 function sendMessage(content) {
-  if (!content.trim() || !currentGroup) return;
+  if (!content || !content.trim() || !currentGroup) return;
   sb.from('group_messages').insert({
     group_id: currentGroup.id,
     user_id: currentUser.id,
     content: content.trim()
   }).then(function(res) {
-    if (res.error) console.error(res.error);
+    if (res.error) console.error('sendMessage:', res.error);
   });
 }
 
 function renderMessages() {
   var el = document.getElementById('chat-messages');
   if (!el) return;
+  if (groupMessages.length === 0) {
+    el.innerHTML = '<div class="empty-state" style="margin-top:40px">Pas encore de messages. Dites bonjour !</div>';
+    return;
+  }
   el.innerHTML = groupMessages.map(function(m) {
     var isMe = m.user_id === currentUser.id;
+    var author = m.profiles ? m.profiles.username : '?';
     return '<div class="message ' + (isMe ? 'message-me' : 'message-them') + '">' +
-      (!isMe ? '<div class="message-author">' + (m.profiles ? m.profiles.username : '?') + '</div>' : '') +
+      (!isMe ? '<div class="message-author">' + author + '</div>' : '') +
       '<div class="message-bubble">' + m.content + '</div>' +
     '</div>';
   }).join('');
@@ -136,10 +170,10 @@ function renderMessages() {
 }
 
 function subscribeToGroup(groupId) {
-  if (messagesSubscription) messagesSubscription.unsubscribe();
-  if (swipesSubscription) swipesSubscription.unsubscribe();
+  if (messagesSubscription) { try { messagesSubscription.unsubscribe(); } catch(e) {} }
+  if (swipesSubscription) { try { swipesSubscription.unsubscribe(); } catch(e) {} }
 
-  messagesSubscription = sb.channel('messages-' + groupId)
+  messagesSubscription = sb.channel('msg-' + groupId)
     .on('postgres_changes', {
       event: 'INSERT', schema: 'public', table: 'group_messages',
       filter: 'group_id=eq.' + groupId
@@ -149,7 +183,7 @@ function subscribeToGroup(groupId) {
     })
     .subscribe();
 
-  swipesSubscription = sb.channel('swipes-' + groupId)
+  swipesSubscription = sb.channel('swp-' + groupId)
     .on('postgres_changes', {
       event: 'INSERT', schema: 'public', table: 'group_swipes',
       filter: 'group_id=eq.' + groupId
@@ -157,26 +191,24 @@ function subscribeToGroup(groupId) {
       var s = payload.new;
       if (!groupSwipes[s.event_id]) groupSwipes[s.event_id] = [];
       groupSwipes[s.event_id].push(s);
-      checkForMatch(s.event_id);
       if (groupTab === 'matches') renderGroupMatches();
     })
     .subscribe();
 }
 
-// ── SWIPE GROUPE ──
 function loadGroupSwipes(groupId) {
   sb.from('group_swipes')
     .select('*')
     .eq('group_id', groupId)
     .then(function(res) {
-      if (res.error) return;
+      if (res.error) { console.error('loadGroupSwipes:', res.error); return; }
       groupSwipes = {};
       (res.data || []).forEach(function(s) {
         if (!groupSwipes[s.event_id]) groupSwipes[s.event_id] = [];
         groupSwipes[s.event_id].push(s);
       });
-      renderGroupMatches();
-      renderGroupSwipeDeck();
+      if (groupTab === 'matches') renderGroupMatches();
+      if (groupTab === 'swipe') renderGroupSwipeDeck();
     });
 }
 
@@ -188,18 +220,23 @@ function groupSwipeEvent(eventId, direction) {
     event_id: String(eventId),
     direction: direction
   }).then(function(res) {
-    if (res.error && res.error.code !== '23505') console.error(res.error);
+    if (res.error && res.error.code !== '23505') console.error('groupSwipeEvent:', res.error);
+    if (direction === 'like') {
+      if (!groupSwipes[String(eventId)]) groupSwipes[String(eventId)] = [];
+      groupSwipes[String(eventId)].push({ user_id: currentUser.id, direction: 'like', event_id: String(eventId) });
+      checkForMatch(String(eventId));
+    }
   });
 }
 
 function checkForMatch(eventId) {
-  var swipesForEvent = groupSwipes[eventId] || [];
-  var likes = swipesForEvent.filter(function(s) { return s.direction === 'like'; });
   sb.from('group_members').select('user_id').eq('group_id', currentGroup.id)
     .then(function(res) {
       var total = (res.data || []).length;
-      if (likes.length === total && total > 0) {
+      var likes = (groupSwipes[eventId] || []).filter(function(s) { return s.direction === 'like'; });
+      if (total > 0 && likes.length >= total) {
         showGroupMatchModal(eventId);
+        if (groupTab === 'matches') renderGroupMatches();
       }
     });
 }
@@ -215,10 +252,8 @@ function renderGroupSwipeDeck() {
   var stack = document.getElementById('group-swipe-stack');
   if (!stack) return;
 
-  var mySwipedIds = [];
-  Object.keys(groupSwipes).forEach(function(eid) {
-    var mine = groupSwipes[eid].find(function(s) { return s.user_id === currentUser.id; });
-    if (mine) mySwipedIds.push(eid);
+  var mySwipedIds = Object.keys(groupSwipes).filter(function(eid) {
+    return (groupSwipes[eid] || []).find(function(s) { return s.user_id === currentUser.id; });
   });
 
   var remaining = EVENTS.filter(function(e) {
@@ -234,9 +269,7 @@ function renderGroupSwipeDeck() {
   remaining.slice(0, 3).forEach(function(ev, i) {
     var card = createCard(ev, i);
     stack.appendChild(card);
-    if (i === 0) {
-      setupGroupCardSwipe(card, ev);
-    }
+    if (i === 0) setupGroupCardSwipe(card, ev);
   });
 
   var cards = stack.querySelectorAll('.event-card');
@@ -256,7 +289,7 @@ function setupGroupCardSwipe(card, ev) {
   function doSwipe(direction) {
     var x = direction === 'like' ? window.innerWidth * 1.5 : -window.innerWidth * 1.5;
     card.style.transition = 'transform 0.4s ease, opacity 0.4s ease';
-    card.style.transform = 'translate(' + x + 'px, 0) rotate(' + (direction === 'like' ? 30 : -30) + 'deg)';
+    card.style.transform = 'translate(' + x + 'px,0) rotate(' + (direction === 'like' ? 30 : -30) + 'deg)';
     card.style.opacity = '0';
     groupSwipeEvent(ev.id, direction);
     setTimeout(function() { card.remove(); renderGroupSwipeDeck(); }, 400);
@@ -297,34 +330,31 @@ function setupGroupCardSwipe(card, ev) {
     else { card.style.transform = ''; likeLabel.style.opacity = 0; nopeLabel.style.opacity = 0; }
   });
 
-  document.getElementById('grp-btn-like') && (document.getElementById('grp-btn-like').onclick = function() { doSwipe('like'); });
-  document.getElementById('grp-btn-dislike') && (document.getElementById('grp-btn-dislike').onclick = function() { doSwipe('dislike'); });
+  var likeBtn = document.getElementById('grp-btn-like');
+  var dislikeBtn = document.getElementById('grp-btn-dislike');
+  if (likeBtn) likeBtn.onclick = function() { doSwipe('like'); };
+  if (dislikeBtn) dislikeBtn.onclick = function() { doSwipe('dislike'); };
 }
 
-// ── MATCHES ──
 function renderGroupMatches() {
   var el = document.getElementById('group-matches-list');
-  if (!el) return;
+  if (!el || !currentGroup) return;
 
   sb.from('group_members').select('user_id').eq('group_id', currentGroup.id)
     .then(function(res) {
       var totalMembers = (res.data || []).length;
       var matches = [];
-
       Object.keys(groupSwipes).forEach(function(eventId) {
-        var swipes = groupSwipes[eventId];
-        var likes = swipes.filter(function(s) { return s.direction === 'like'; });
-        if (likes.length === totalMembers && totalMembers > 0) {
+        var likes = (groupSwipes[eventId] || []).filter(function(s) { return s.direction === 'like'; });
+        if (totalMembers > 0 && likes.length >= totalMembers) {
           var ev = EVENTS.find(function(e) { return String(e.id) === eventId; });
           if (ev) matches.push(ev);
         }
       });
-
       if (matches.length === 0) {
         el.innerHTML = '<div class="empty-state">Pas encore de match ! Swipez ensemble.</div>';
         return;
       }
-
       el.innerHTML = matches.map(function(ev) {
         return '<div class="match-card">' +
           '<img class="match-card-img" src="' + ev.image + '" alt="' + ev.title + '" />' +
@@ -338,7 +368,6 @@ function renderGroupMatches() {
     });
 }
 
-// ── TABS GROUPE ──
 function switchGroupTab(tab) {
   groupTab = tab;
   document.querySelectorAll('.group-tab-btn').forEach(function(b) {
