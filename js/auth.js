@@ -34,11 +34,15 @@ var appStarted = false;
 function startApp() {
   if (appStarted) return;
   appStarted = true;
+  // Charge les likes sauvegardés
+  var savedLikes = localStorage.getItem('outnow_liked_events');
+  if (savedLikes) {
+    try { state.liked = JSON.parse(savedLikes); } catch(e) {}
+  }
   showScreen('home');
   loadEvents().then(function() { buildDeck(); renderCards(); });
   updateProfileUI();
 }
-
 function loadProfile(userId) {
   return sb.from('profiles').select('*').eq('id', userId).single()
     .then(function(res) { return res.data; });
