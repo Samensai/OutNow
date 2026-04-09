@@ -4,3 +4,21 @@ var SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 var sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 var currentUser = null;
 var currentProfile = null;
+
+// Notifications - défini ici pour être disponible avant friends.js et groups.js
+var notifications = {
+  newFriendRequest: false,
+  newGroup: false,
+  groups: {}
+};
+
+function updateNotificationDots() {
+  var friendDot = document.getElementById('dot-friends');
+  if (friendDot) friendDot.classList.toggle('hidden', !notifications.newFriendRequest);
+  var hasGroupNotif = notifications.newGroup ||
+    Object.keys(notifications.groups).some(function(gid) {
+      return notifications.groups[gid] && (notifications.groups[gid].chat || notifications.groups[gid].matches);
+    });
+  var groupDot = document.getElementById('dot-groups');
+  if (groupDot) groupDot.classList.toggle('hidden', !hasGroupNotif);
+}
