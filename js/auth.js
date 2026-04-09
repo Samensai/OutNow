@@ -56,7 +56,8 @@ function startApp() {
   }, 30000);
 
   // Polling messages toutes les 10 secondes pour tous les groupes
-  var lastSeenMessages = JSON.parse(localStorage.getItem('outnow_last_seen') || '{}');
+  var lastSeenMessages = {};
+  try { lastSeenMessages = JSON.parse(localStorage.getItem('outnow_last_seen') || '{}'); } catch(e) {}
 
   setInterval(function() {
     if (!currentUser) return;
@@ -81,7 +82,7 @@ function startApp() {
                 } else {
                   // On est dans le chat, marque comme vu
                   lastSeenMessages[gid] = last.created_at;
-                  localStorage.setItem('outnow_last_seen', JSON.stringify(lastSeenMessages));
+                  try { localStorage.setItem('outnow_last_seen', JSON.stringify(lastSeenMessages)); } catch(e) {}
                 }
               }
             });
@@ -98,7 +99,7 @@ function startApp() {
       .then(function(r) {
         if (r.data && r.data.length > 0) {
           lastSeenMessages[groupId] = r.data[0].created_at;
-          localStorage.setItem('outnow_last_seen', JSON.stringify(lastSeenMessages));
+          try { localStorage.setItem('outnow_last_seen', JSON.stringify(lastSeenMessages)); } catch(e) {}
         }
       });
   };
