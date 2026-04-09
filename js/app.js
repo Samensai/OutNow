@@ -147,7 +147,6 @@ function swipeCard(direction, card, ev) {
   card.style.opacity = '0';
   if (direction === 'like') {
     state.liked.push(ev);
-    localStorage.setItem('outnow_liked_events', JSON.stringify(state.liked));
   } else {
     state.disliked.push(ev.id);
   }
@@ -251,22 +250,10 @@ function renderLikes() {
     likesGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text2)"><div style="font-size:48px;margin-bottom:16px">❤️</div><div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">Pas encore de likes</div></div>';
     return;
   }
-  var now = new Date();
   likesGrid.innerHTML = state.liked.map(function(ev) {
-    var isPast = false;
-    if (ev.firstTiming && ev.firstTiming.end) {
-      isPast = new Date(ev.firstTiming.end) < now;
-    } else if (ev.date && ev.date !== 'Prochainement') {
-      // Essaie de parser la date affichée
-      isPast = false; // difficile à parser, on laisse false par défaut
-    }
     return '<div class="like-item" onclick="openLikeDetail(' + ev.id + ')">' +
       '<img src="' + ev.image + '" alt="' + ev.title + '" loading="lazy" />' +
-      (isPast ? '<div class="like-past-badge">Passe</div>' : '') +
-      '<div class="like-item-info">' +
-        '<div class="like-item-title">' + ev.title + '</div>' +
-        '<div class="like-item-date">' + ev.date + '</div>' +
-      '</div>' +
+      '<div class="like-item-info"><div class="like-item-title">' + ev.title + '</div><div class="like-item-date">' + ev.date + '</div></div>' +
     '</div>';
   }).join('');
 }
@@ -275,3 +262,14 @@ window.openLikeDetail = function(id) {
   var ev = EVENTS.find(function(e) { return e.id === id; });
   if (ev) openDetail(ev);
 };
+
+// Fix retour depuis detail
+var previousScreen = 'home';
+function goBack() {
+  if (typeof previousScreen !== 'undefined' && previousScreen === 'group-detail') {
+    showScreen('group-detail');
+  } else {
+    showScreen('home');
+  }
+  previousScreen = 'home';
+}
