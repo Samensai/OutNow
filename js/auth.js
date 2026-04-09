@@ -12,6 +12,7 @@ function initAuth() {
     } else {
       currentUser = null;
       currentProfile = null;
+      appStarted = false;
       showAuthScreen();
     }
   });
@@ -34,15 +35,27 @@ var appStarted = false;
 function startApp() {
   if (appStarted) return;
   appStarted = true;
+
   // Charge les likes sauvegardés
   var savedLikes = localStorage.getItem('outnow_liked_events');
-  if (savedLikes) {
-    try { state.liked = JSON.parse(savedLikes); } catch(e) {}
-  }
+  if (savedLikes) { try { state.liked = JSON.parse(savedLikes); } catch(e) {} }
+
   showScreen('home');
   loadEvents().then(function() { buildDeck(); renderCards(); });
   updateProfileUI();
+
+  // Vérifie les notifs après que la nav soit visible
+  setTimeout(function() {
+    loadPendingRequests();
+    loadUserGroups();
+  }, 800);
+
+  // Polling notifs toutes les 30 secondes
+  setInterval(function() {
+    if (currentUser) loadPendingRequests();
+  }, 30000);
 }
+
 function loadProfile(userId) {
   return sb.from('profiles').select('*').eq('id', userId).single()
     .then(function(res) { return res.data; });
@@ -75,35 +88,15 @@ document.getElementById('btn-login').addEventListener('click', function() {
   var errEl = document.getElementById('login-error');
   errEl.classList.add('hidden');
 
-  if (!identifier || !password) {
-    showAuthError(errEl, 'Remplis tous les champs.');
-    return;
-  }
+  if (!identifier || !password) { showAuthError(errEl, 'Remplis tous les champs.'); return; }
 
   var btn = document.getElementById('btn-login');
   btn.textContent = 'Connexion...';
   btn.disabled = true;
 
-  // Si c'est un pseudo, on cherche l'email associé
-  var loginPromise;
-  if (identifier.indexOf('@') === -1) {
-    loginPromise = sb.from('profiles').select('id').eq('username', identifier).single()
-      .then(function(res) {
-        if (!res.data) throw new Error('Pseudo introuvable.');
-        return sb.auth.admin ? null : res.data.id;
-      })
-      .then(function() {
-        // On ne peut pas récupérer l'email par pseudo sans droits admin
-        // On informe l'utilisateur d'utiliser son email
-        throw new Error('Utilise ton adresse email pour te connecter.');
-      });
-  } else {
-    loginPromise = sb.auth.signInWithPassword({ email: identifier, password: password });
-  }
-
-  loginPromise
+  sb.auth.signInWithPassword({ email: identifier, password: password })
     .then(function(res) {
-      if (res && res.error) throw res.error;
+      if (res.error) throw res.error;
     })
     .catch(function(err) {
       showAuthError(errEl, err.message || 'Erreur de connexion.');
@@ -120,41 +113,30 @@ document.getElementById('btn-register').addEventListener('click', function() {
   var errEl = document.getElementById('reg-error');
   errEl.classList.add('hidden');
 
-  if (!username || !email || !password) {
-    showAuthError(errEl, 'Remplis tous les champs.');
-    return;
-  }
-  if (username.length < 3) {
-    showAuthError(errEl, 'Le pseudo doit faire au moins 3 caracteres.');
-    return;
-  }
-  if (password.length < 6) {
-    showAuthError(errEl, 'Le mot de passe doit faire au moins 6 caracteres.');
-    return;
-  }
+  if (!username || !email || !password) { showAuthError(errEl, 'Remplis tous les champs.'); return; }
+  if (username.length < 3) { showAuthError(errEl, 'Pseudo trop court (3 car. min).'); return; }
+  if (password.length < 6) { showAuthError(errEl, 'Mot de passe trop court (6 car. min).'); return; }
 
   var btn = document.getElementById('btn-register');
   btn.textContent = 'Creation...';
   btn.disabled = true;
 
-  // Vérifie si le pseudo est déjà pris
   sb.from('profiles').select('id').eq('username', username).single()
     .then(function(res) {
       if (res.data) throw new Error('Ce pseudo est deja pris.');
-      return sb.auth.signUp({ email: email, password: password, options: {data: { username: username }}});
+      return sb.auth.signUp({
+        email: email, password: password,
+        options: { data: { username: username } }
+      });
     })
     .then(function(res) {
       if (res.error) throw res.error;
-      var userId = res.data.user.id;
-    })
-    .then(function(res) {
-      if (res.error) throw res.error;
-      showAuthError(errEl, 'Compte cree ! Verifie ton email pour confirmer.', true);
+      showAuthError(errEl, 'Compte cree ! Connecte-toi.', true);
       btn.textContent = 'Creer mon compte';
       btn.disabled = false;
     })
     .catch(function(err) {
-      showAuthError(errEl, err.message || 'Erreur lors de la creation du compte.');
+      showAuthError(errEl, err.message || 'Erreur.');
       btn.textContent = 'Creer mon compte';
       btn.disabled = false;
     });
@@ -166,7 +148,7 @@ function showAuthError(el, msg, success) {
   el.style.color = success ? '#4ade80' : 'var(--accent)';
 }
 
-// ── LOGOUT ──
 window.logout = function() {
+  appStarted = false;
   sb.auth.signOut();
 };
