@@ -72,18 +72,29 @@ function rejectFriendRequest(friendshipId) {
 
 function removeFriend(friendId) {
   var uid = currentUser.id;
-  sb.from('friendships')
-    .select('id')
-    .or('and(requester_id.eq.' + uid + ',receiver_id.eq.' + friendId + '),and(requester_id.eq.' + friendId + ',receiver_id.eq.' + uid + ')')
-    .then(function(res) {
-      if (res.error) { console.error(res.error); return; }
-      if (!res.data || res.data.length === 0) { alert('Amitie introuvable.'); return; }
-      return sb.from('friendships').delete().eq('id', res.data[0].id)
+  // Cherche via les deux directions possibles
+  sb.from('friendships').select('id')
+    .eq('requester_id', uid).eq('receiver_id', friendId)
+    .then(function(res1) {
+      if (res1.data && res1.data.length > 0) {
+        return res1.data[0].id;
+      }
+      return sb.from('friendships').select('id')
+        .eq('requester_id', friendId).eq('receiver_id', uid)
         .then(function(res2) {
-          if (res2.error) { console.error(res2.error); return; }
+          if (res2.data && res2.data.length > 0) return res2.data[0].id;
+          return null;
+        });
+    })
+    .then(function(fid) {
+      if (!fid) { console.error('Friendship not found'); return; }
+      return sb.from('friendships').delete().eq('id', fid)
+        .then(function(res) {
+          console.log('removeFriend result:', res);
           loadFriends();
         });
-    });
+    })
+    .catch(function(err) { console.error('removeFriend error:', err); });
 }
 
 function createGroupWithFriend(friendId, friendName) {
