@@ -149,21 +149,41 @@ function showFriendMenu(friendId, friendName, anchor) {
   var menu = document.createElement('div');
   menu.id = 'friend-dropdown';
   menu.className = 'dropdown-menu';
-  menu.innerHTML =
-    '<button class="dropdown-item" onclick="createGroupWithFriend(\'' + friendId + '\', \'' + friendName + '\')">👥 Creer un groupe</button>' +
-    '<button class="dropdown-item danger" onclick="removeFriend(\'' + friendId + '\')">🗑️ Supprimer l\'ami</button>';
 
+  var btn1 = document.createElement('button');
+  btn1.className = 'dropdown-item';
+  btn1.textContent = '👥 Creer un groupe';
+  btn1.addEventListener('click', function(e) {
+    e.stopPropagation();
+    menu.remove();
+    createGroupWithFriend(friendId, friendName);
+  });
+
+  var btn2 = document.createElement('button');
+  btn2.className = 'dropdown-item danger';
+  btn2.textContent = '🗑️ Supprimer l\'ami';
+  btn2.addEventListener('click', function(e) {
+    e.stopPropagation();
+    menu.remove();
+    removeFriend(friendId);
+  });
+
+  menu.appendChild(btn1);
+  menu.appendChild(btn2);
   document.body.appendChild(menu);
+
   var rect = anchor.getBoundingClientRect();
   menu.style.top = (rect.bottom + 4) + 'px';
   menu.style.right = (window.innerWidth - rect.right) + 'px';
 
   setTimeout(function() {
-    document.addEventListener('click', function handler() {
-      menu.remove();
-      document.removeEventListener('click', handler);
+    document.addEventListener('click', function handler(e) {
+      if (!menu.contains(e.target)) {
+        menu.remove();
+        document.removeEventListener('click', handler);
+      }
     });
-  }, 10);
+  }, 50);
 }
 
 function renderPendingRequests() {
