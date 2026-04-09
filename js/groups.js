@@ -178,17 +178,32 @@ function addMemberToGroup(groupId) {
 }
 
 function deleteGroup(groupId) {
-  sb.from('group_swipes').delete().eq('group_id', groupId)
-    .then(function() { return sb.from('group_messages').delete().eq('group_id', groupId); })
-    .then(function() { return sb.from('group_members').delete().eq('group_id', groupId); })
-    .then(function() { return sb.from('groups').delete().eq('id', groupId); })
-    .then(function() { loadUserGroups(); })
-    .catch(function(err) { console.error(err); alert('Erreur: ' + (err.message || JSON.stringify(err))); });
+  // Supprime en parallèle les données liées, puis le groupe
+  Promise.all([
+    sb.from('group_swipes').delete().eq('group_id', groupId),
+    sb.from('group_messages').delete().eq('group_id', groupId),
+    sb.from('group_members').delete().eq('group_id', groupId)
+  ]).then(function(results) {
+    console.log('delete related:', results);
+    return sb.from('groups').delete().eq('id', groupId);
+  }).then(function(res) {
+    console.log('delete group:', res);
+    loadUserGroups();
+  }).catch(function(err) {
+    console.error('deleteGroup error:', err);
+  });
 }
 
 function leaveGroup(groupId) {
-  sb.from('group_members').delete().eq('group_id', groupId).eq('user_id', currentUser.id)
-    .then(function() { loadUserGroups(); });
+  sb.from('group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', currentUser.id)
+    .then(function(res) {
+      console.log('leaveGroup:', res);
+      loadUserGroups();
+    })
+    .catch(function(err) { console.error('leaveGroup error:', err); });
 }
 
 // ── CRÉER UN GROUPE ──
