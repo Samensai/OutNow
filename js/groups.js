@@ -174,15 +174,19 @@ function addMemberToGroup(groupId) {
 
 function deleteGroup(groupId) {
   if (!confirm('Supprimer ce groupe ? Cette action est irreversible.')) return;
-  sb.from('group_swipes').delete().eq('group_id', groupId).then(function() {
-    return sb.from('group_messages').delete().eq('group_id', groupId);
-  }).then(function() {
-    return sb.from('group_members').delete().eq('group_id', groupId);
-  }).then(function() {
-    return sb.from('groups').delete().eq('id', groupId);
-  }).then(function() {
-    loadUserGroups();
-  }).catch(function(err) { alert('Erreur: ' + err.message); });
+  var del = function(table, col) {
+    return sb.from(table).delete().eq(col, groupId);
+  };
+  del('group_swipes', 'group_id')
+    .then(function() { return del('group_messages', 'group_id'); })
+    .then(function() { return del('group_members', 'group_id'); })
+    .then(function() { return sb.from('groups').delete().eq('id', groupId); })
+    .then(function() {
+      var existing = document.getElementById('group-dropdown');
+      if (existing) existing.remove();
+      loadUserGroups();
+    })
+    .catch(function(err) { console.error(err); alert('Erreur suppression: ' + (err.message || JSON.stringify(err))); });
 }
 
 function leaveGroup(groupId) {
@@ -230,18 +234,7 @@ function openGroup(groupId, groupName) {
 }
 
 function loadGroupMembers(groupId) {
-  sb.from('group_members')
-    .select('user_id, profiles(id, username)')
-    .eq('group_id', groupId)
-    .then(function(res) {
-      if (res.error) return;
-      var members = (res.data || []).map(function(r) { return r.profiles; }).filter(Boolean);
-      var el = document.getElementById('group-members-bar');
-      if (!el) return;
-      el.innerHTML = members.map(function(m) {
-        return '<div class="member-chip">' + m.username.charAt(0).toUpperCase() + '<span>' + m.username + '</span></div>';
-      }).join('');
-    });
+  // Members bar supprimee du HTML - rien a faire ici
 }
 
 // ── CHAT ──
@@ -523,10 +516,6 @@ function switchGroupTab(tab) {
   document.querySelectorAll('.group-tab-content').forEach(function(c) {
     c.classList.toggle('hidden', c.dataset.tab !== tab);
   });
-  // Cache la members bar en mode swipe pour gagner de la place
-  var membersBar = document.getElementById('group-members-bar');
-  if (membersBar) membersBar.style.display = tab === 'swipe' ? 'none' : 'flex';
-
   // Efface notif du tab actif
   if (currentGroup) {
     if (tab === 'chat') setGroupNotif(currentGroup.id, 'chat', false);
