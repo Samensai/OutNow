@@ -123,9 +123,7 @@
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </button>
     </header>
-    <div id="my-groups-list" style="padding:16px;overflow-y:auto;flex:1;"></div>
-
-    <!-- Create Group Modal -->
+    <div id="my-groups-list" style="padding:16px;overflow-y:auto;flex:1;padding-bottom:80px;"></div>
     <div id="create-group-modal" class="modal hidden">
       <div class="modal-content">
         <h2 style="margin-bottom:16px">Nouveau groupe</h2>
@@ -148,9 +146,6 @@
       <div style="width:40px"></div>
     </header>
 
-    <!-- Members bar -->
-    <div id="group-members-bar" class="group-members-bar"></div>
-
     <!-- Tabs -->
     <div class="group-tabs">
       <button class="group-tab-btn active" data-tab="chat" onclick="switchGroupTab('chat')">💬 Chat</button>
@@ -159,9 +154,9 @@
     </div>
 
     <!-- Chat -->
-    <div class="group-tab-content" data-tab="chat" style="display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;">
-      <div id="chat-messages" class="chat-messages" style="flex:1;overflow-y:auto;padding:16px;min-height:0;"></div>
-      <div class="chat-input-bar" style="display:flex!important;gap:8px;padding:12px 16px;border-top:1px solid #1c1c28;background:#0a0a0f;flex-shrink:0;min-height:60px;">
+    <div class="group-tab-content" data-tab="chat">
+      <div id="chat-messages" class="chat-messages"></div>
+      <div class="chat-input-bar" style="margin-bottom:calc(60px + env(safe-area-inset-bottom, 0px))">
         <input type="text" id="chat-input" placeholder="Message..." class="chat-input" />
         <button class="send-btn" id="btn-send-message">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2 21l21-9L2 3v7l15 2-15 2v7z"/></svg>
@@ -172,7 +167,7 @@
     <!-- Swipe -->
     <div class="group-tab-content hidden" data-tab="swipe">
       <div class="card-stack" id="group-swipe-stack"></div>
-      <div class="action-bar">
+      <div class="action-bar" style="padding-bottom:calc(60px + env(safe-area-inset-bottom,0px) + 8px)">
         <button class="action-btn dislike" id="grp-btn-dislike">
           <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
@@ -184,7 +179,7 @@
 
     <!-- Matches -->
     <div class="group-tab-content hidden" data-tab="matches">
-      <div id="group-matches-list" style="padding:16px;overflow-y:auto;flex:1;padding-bottom:80px;"></div>
+      <div id="group-matches-list" style="padding:16px;overflow-y:auto;flex:1;padding-bottom:calc(80px + env(safe-area-inset-bottom,0px));"></div>
     </div>
   </div>
 
@@ -262,7 +257,6 @@
 <script src="js/friends.js"></script>
 <script src="js/groups.js"></script>
 <script>
-  // Init
   window.addEventListener('load', function() {
     setTimeout(function() {
       document.getElementById('splash').style.display = 'none';
@@ -271,7 +265,6 @@
     }, 1800);
   });
 
-  // Nav
   document.querySelectorAll('.nav-item').forEach(function(btn) {
     btn.addEventListener('click', function() {
       var s = btn.dataset.screen;
@@ -285,26 +278,26 @@
     });
   });
 
-  // Back buttons
-  document.getElementById('btn-back-group-detail').addEventListener('click', function() { showScreen('groups'); loadUserGroups(); });
+  document.getElementById('btn-back-group-detail').addEventListener('click', function() {
+    if (pollingInterval) clearInterval(pollingInterval);
+    showScreen('groups');
+    loadUserGroups();
+  });
+
   document.getElementById('btn-share-detail').addEventListener('click', function() {
     if (navigator.share && state.currentDetail) {
       navigator.share({ title: state.currentDetail.title, url: window.location.href });
     }
   });
 
-  // Match modal
   document.getElementById('btn-match-ok').addEventListener('click', function() {
     document.getElementById('match-modal').classList.add('hidden');
   });
 
-  // New group
   document.getElementById('btn-new-group').addEventListener('click', function() {
     var picker = document.getElementById('friend-picker');
     picker.innerHTML = friendsList.map(function(f) {
-      return '<label class="friend-pick-item">' +
-        '<input type="checkbox" value="' + f.id + '" /> ' + f.username +
-      '</label>';
+      return '<label class="friend-pick-item"><input type="checkbox" value="' + f.id + '" /> ' + f.username + '</label>';
     }).join('') || '<div class="empty-state">Ajoute des amis d\'abord !</div>';
     document.getElementById('create-group-modal').classList.remove('hidden');
   });
@@ -315,23 +308,19 @@
     var checked = document.querySelectorAll('#friend-picker input:checked');
     var memberIds = Array.from(checked).map(function(c) { return c.value; });
     document.getElementById('create-group-modal').classList.add('hidden');
+    document.getElementById('new-group-name').value = '';
     createGroup(name, memberIds);
   });
 
-  // Chat send
   document.getElementById('btn-send-message').addEventListener('click', function() {
     var input = document.getElementById('chat-input');
     sendMessage(input.value);
     input.value = '';
   });
   document.getElementById('chat-input').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') {
-      sendMessage(this.value);
-      this.value = '';
-    }
+    if (e.key === 'Enter') { sendMessage(this.value); this.value = ''; }
   });
 
-  // SW
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('sw.js');
   }
