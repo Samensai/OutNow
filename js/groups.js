@@ -494,5 +494,10 @@ function switchGroupTab(tab) {
   }
   if (tab === 'matches') renderGroupMatches();
   if (tab === 'swipe') renderGroupSwipeDeck();
-  if (tab === 'chat') renderMessages();
+  if (tab === 'chat') {
+    renderMessages();
+    if (currentGroup && typeof markGroupChatSeen === 'function') {
+      markGroupChatSeen(currentGroup.id);
+    }
+  }
 }
