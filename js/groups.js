@@ -9,24 +9,7 @@ var swipesSubscription = null;
 var pollingInterval = null;
 var previousScreen = 'groups';
 
-// ── NOTIFICATIONS ──
-var notifications = {
-  newFriendRequest: false,
-  newGroup: false,
-  groups: {}
-};
-
-function updateNotificationDots() {
-  var friendDot = document.getElementById('dot-friends');
-  if (friendDot) friendDot.classList.toggle('hidden', !notifications.newFriendRequest);
-
-  var hasGroupNotif = notifications.newGroup ||
-    Object.keys(notifications.groups).some(function(gid) {
-      return notifications.groups[gid] && (notifications.groups[gid].chat || notifications.groups[gid].matches);
-    });
-  var groupDot = document.getElementById('dot-groups');
-  if (groupDot) groupDot.classList.toggle('hidden', !hasGroupNotif);
-}
+// ── NOTIFICATIONS (definies dans supabase.js) ──
 
 function setGroupNotif(groupId, type, val) {
   if (!notifications.groups[groupId]) notifications.groups[groupId] = { chat: false, matches: false };
@@ -195,7 +178,6 @@ function addMemberToGroup(groupId) {
 }
 
 function deleteGroup(groupId) {
-  if (!confirm('Supprimer ce groupe ? Action irreversible.')) return;
   sb.from('group_swipes').delete().eq('group_id', groupId)
     .then(function() { return sb.from('group_messages').delete().eq('group_id', groupId); })
     .then(function() { return sb.from('group_members').delete().eq('group_id', groupId); })
@@ -205,7 +187,6 @@ function deleteGroup(groupId) {
 }
 
 function leaveGroup(groupId) {
-  if (!confirm('Quitter ce groupe ?')) return;
   sb.from('group_members').delete().eq('group_id', groupId).eq('user_id', currentUser.id)
     .then(function() { loadUserGroups(); });
 }
