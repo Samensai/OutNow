@@ -430,7 +430,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px;
 .group-tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 
 .group-tab-content {
-  flex: 1; display: flex; flex-direction: column; overflow: hidden; min-height: 0;
+  flex: 1; display: flex; flex-direction: column;
 }
 .group-tab-content.hidden { display: none; }
 
@@ -438,7 +438,7 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px;
 .chat-messages {
   flex: 1; overflow-y: auto; padding: 16px;
   display: flex; flex-direction: column; gap: 10px;
-  -webkit-overflow-scrolling: touch; min-height: 0;
+  -webkit-overflow-scrolling: touch;
 }
 .message { display: flex; flex-direction: column; max-width: 75%; }
 .message-me { align-self: flex-end; align-items: flex-end; }
