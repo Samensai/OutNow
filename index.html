@@ -273,8 +273,8 @@
         n.classList.toggle('active', n.dataset.screen === s);
       });
       if (s === 'likes') renderLikes();
-      if (s === 'friends') { loadFriends(); loadPendingRequests(); }
-      if (s === 'groups') loadUserGroups();
+      if (s === 'friends') { if (typeof loadFriends === 'function') { loadFriends(); loadPendingRequests(); } }
+      if (s === 'groups') { if (typeof loadUserGroups === 'function') loadUserGroups(); }
     });
   });
 
