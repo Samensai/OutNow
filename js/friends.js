@@ -3,11 +3,6 @@
 var friendsList = [];
 var pendingRequests = [];
 
-function initFriends() {
-  loadFriends();
-  loadPendingRequests();
-}
-
 function loadFriends() {
   if (!currentUser) return;
   sb.from('friendships')
@@ -32,11 +27,8 @@ function loadPendingRequests() {
     .then(function(res) {
       if (res.error) return;
       pendingRequests = res.data || [];
-      // Notif point rouge si demandes en attente
-      if (typeof notifications !== 'undefined') {
-        notifications.newFriendRequest = pendingRequests.length > 0;
-        updateNotificationDots();
-      }
+      notifications.newFriendRequest = pendingRequests.length > 0;
+      updateNotificationDots();
       renderPendingRequests();
     });
 }
@@ -81,27 +73,21 @@ function rejectFriendRequest(friendshipId) {
 function removeFriend(friendId) {
   if (!confirm('Supprimer cet ami ?')) return;
   var uid = currentUser.id;
-  // Cherche d'abord la friendship
   sb.from('friendships')
     .select('id')
     .or('and(requester_id.eq.' + uid + ',receiver_id.eq.' + friendId + '),and(requester_id.eq.' + friendId + ',receiver_id.eq.' + uid + ')')
     .then(function(res) {
-      if (res.error || !res.data || res.data.length === 0) {
-        alert('Amitie introuvable.'); return;
-      }
-      var fid = res.data[0].id;
-      return sb.from('friendships').delete().eq('id', fid);
-    })
-    .then(function() {
-      var existing = document.getElementById('friend-dropdown');
-      if (existing) existing.remove();
-      loadFriends();
-    })
-    .catch(function(err) { console.error(err); alert('Erreur: ' + (err.message || JSON.stringify(err))); });
+      if (res.error) { console.error(res.error); return; }
+      if (!res.data || res.data.length === 0) { alert('Amitie introuvable.'); return; }
+      return sb.from('friendships').delete().eq('id', res.data[0].id)
+        .then(function(res2) {
+          if (res2.error) { console.error(res2.error); return; }
+          loadFriends();
+        });
+    });
 }
 
 function createGroupWithFriend(friendId, friendName) {
-  // Pré-sélectionne l'ami et ouvre la modal de création de groupe
   showScreen('groups');
   document.querySelectorAll('.nav-item').forEach(function(n) {
     n.classList.toggle('active', n.dataset.screen === 'groups');
@@ -126,19 +112,21 @@ function renderFriendsList() {
     el.innerHTML = '<div class="empty-state">Pas encore d\'amis. Recherche des gens par pseudo !</div>';
     return;
   }
-  el.innerHTML = friendsList.map(function(f) {
-    return '<div class="friend-item">' +
-      '<div class="friend-avatar">' + f.username.charAt(0).toUpperCase() + '</div>' +
-      '<div class="friend-name">' + f.username + '</div>' +
-      '<button class="friend-menu-btn" data-fid="' + f.id + '" data-fname="' + f.username + '">⋮</button>' +
-    '</div>';
-  }).join('');
-
-  el.querySelectorAll('.friend-menu-btn').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
+  el.innerHTML = '';
+  friendsList.forEach(function(f) {
+    var item = document.createElement('div');
+    item.className = 'friend-item';
+    item.innerHTML = '<div class="friend-avatar">' + f.username.charAt(0).toUpperCase() + '</div>' +
+      '<div class="friend-name">' + f.username + '</div>';
+    var menuBtn = document.createElement('button');
+    menuBtn.className = 'friend-menu-btn';
+    menuBtn.textContent = '⋮';
+    menuBtn.addEventListener('click', function(e) {
       e.stopPropagation();
-      showFriendMenu(btn.dataset.fid, btn.dataset.fname, btn);
+      showFriendMenu(f.id, f.username, menuBtn);
     });
+    item.appendChild(menuBtn);
+    el.appendChild(item);
   });
 }
 
@@ -153,7 +141,8 @@ function showFriendMenu(friendId, friendName, anchor) {
   var btn1 = document.createElement('button');
   btn1.className = 'dropdown-item';
   btn1.textContent = '👥 Creer un groupe';
-  btn1.addEventListener('click', function(e) {
+  btn1.addEventListener('mousedown', function(e) {
+    e.preventDefault();
     e.stopPropagation();
     menu.remove();
     createGroupWithFriend(friendId, friendName);
@@ -162,8 +151,21 @@ function showFriendMenu(friendId, friendName, anchor) {
   var btn2 = document.createElement('button');
   btn2.className = 'dropdown-item danger';
   btn2.textContent = '🗑️ Supprimer l\'ami';
-  btn2.addEventListener('click', function(e) {
+  btn2.addEventListener('mousedown', function(e) {
+    e.preventDefault();
     e.stopPropagation();
+    menu.remove();
+    removeFriend(friendId);
+  });
+
+  // Touch support
+  btn1.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    menu.remove();
+    createGroupWithFriend(friendId, friendName);
+  });
+  btn2.addEventListener('touchend', function(e) {
+    e.preventDefault();
     menu.remove();
     removeFriend(friendId);
   });
@@ -179,34 +181,37 @@ function showFriendMenu(friendId, friendName, anchor) {
   setTimeout(function() {
     document.addEventListener('click', function handler(e) {
       if (!menu.contains(e.target)) {
-        menu.remove();
+        if (document.body.contains(menu)) menu.remove();
         document.removeEventListener('click', handler);
       }
     });
-  }, 50);
+  }, 100);
 }
 
 function renderPendingRequests() {
   var el = document.getElementById('pending-requests');
   if (!el) return;
   if (pendingRequests.length === 0) { el.innerHTML = ''; return; }
-  el.innerHTML = '<div class="section-label">Demandes recues (' + pendingRequests.length + ')</div>' +
-    pendingRequests.map(function(r) {
-      return '<div class="friend-item">' +
-        '<div class="friend-avatar">' + r.requester.username.charAt(0).toUpperCase() + '</div>' +
-        '<div class="friend-name">' + r.requester.username + '</div>' +
-        '<div class="friend-actions">' +
-          '<button class="btn-accept" data-id="' + r.id + '">✓</button>' +
-          '<button class="btn-reject" data-id="' + r.id + '">✗</button>' +
-        '</div>' +
-      '</div>';
-    }).join('');
-
-  el.querySelectorAll('.btn-accept').forEach(function(btn) {
-    btn.addEventListener('click', function() { acceptFriendRequest(btn.dataset.id); });
-  });
-  el.querySelectorAll('.btn-reject').forEach(function(btn) {
-    btn.addEventListener('click', function() { rejectFriendRequest(btn.dataset.id); });
+  el.innerHTML = '<div class="section-label">Demandes recues (' + pendingRequests.length + ')</div>';
+  pendingRequests.forEach(function(r) {
+    var item = document.createElement('div');
+    item.className = 'friend-item';
+    item.innerHTML = '<div class="friend-avatar">' + r.requester.username.charAt(0).toUpperCase() + '</div>' +
+      '<div class="friend-name">' + r.requester.username + '</div>';
+    var actions = document.createElement('div');
+    actions.className = 'friend-actions';
+    var accept = document.createElement('button');
+    accept.className = 'btn-accept';
+    accept.textContent = '✓';
+    accept.addEventListener('click', function() { acceptFriendRequest(r.id); });
+    var reject = document.createElement('button');
+    reject.className = 'btn-reject';
+    reject.textContent = '✗';
+    reject.addEventListener('click', function() { rejectFriendRequest(r.id); });
+    actions.appendChild(accept);
+    actions.appendChild(reject);
+    item.appendChild(actions);
+    el.appendChild(item);
   });
 }
 
@@ -214,35 +219,44 @@ function renderSearchResults(users) {
   var el = document.getElementById('search-results');
   if (!el) return;
   if (users.length === 0) { el.innerHTML = '<div class="empty-state">Aucun resultat.</div>'; return; }
-  el.innerHTML = users.map(function(u) {
+  el.innerHTML = '';
+  users.forEach(function(u) {
     var isFriend = friendsList.find(function(f) { return f.id === u.id; });
-    return '<div class="friend-item">' +
-      '<div class="friend-avatar">' + u.username.charAt(0).toUpperCase() + '</div>' +
-      '<div class="friend-name">' + u.username + '</div>' +
-      (isFriend
-        ? '<div class="friend-badge">Ami</div>'
-        : '<button class="btn-add-friend" data-id="' + u.id + '">Ajouter</button>'
-      ) +
-    '</div>';
-  }).join('');
-
-  el.querySelectorAll('.btn-add-friend').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-      btn.textContent = '...'; btn.disabled = true;
-      sendFriendRequest(btn.dataset.id).then(function() {
-        btn.textContent = 'Demande envoyee !';
-      }).catch(function() {
-        btn.textContent = 'Erreur'; btn.disabled = false;
+    var item = document.createElement('div');
+    item.className = 'friend-item';
+    item.innerHTML = '<div class="friend-avatar">' + u.username.charAt(0).toUpperCase() + '</div>' +
+      '<div class="friend-name">' + u.username + '</div>';
+    if (isFriend) {
+      var badge = document.createElement('div');
+      badge.className = 'friend-badge';
+      badge.textContent = 'Ami';
+      item.appendChild(badge);
+    } else {
+      var btn = document.createElement('button');
+      btn.className = 'btn-add-friend';
+      btn.textContent = 'Ajouter';
+      btn.addEventListener('click', function() {
+        btn.textContent = '...'; btn.disabled = true;
+        sendFriendRequest(u.id).then(function() {
+          btn.textContent = 'Envoye !';
+        }).catch(function() {
+          btn.textContent = 'Erreur'; btn.disabled = false;
+        });
       });
-    });
+      item.appendChild(btn);
+    }
+    el.appendChild(item);
   });
 }
 
-var friendSearchInput = document.getElementById('friend-search-input');
-if (friendSearchInput) {
-  friendSearchInput.addEventListener('input', function() {
-    var q = this.value.trim();
-    if (q.length < 2) { document.getElementById('search-results').innerHTML = ''; return; }
-    searchUsers(q).then(renderSearchResults);
-  });
-}
+// Search input
+window.addEventListener('load', function() {
+  var input = document.getElementById('friend-search-input');
+  if (input) {
+    input.addEventListener('input', function() {
+      var q = this.value.trim();
+      if (q.length < 2) { document.getElementById('search-results').innerHTML = ''; return; }
+      searchUsers(q).then(renderSearchResults);
+    });
+  }
+});
