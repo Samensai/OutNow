@@ -54,6 +54,54 @@ function startApp() {
   setInterval(function() {
     if (currentUser) loadPendingRequests();
   }, 30000);
+
+  // Polling messages toutes les 10 secondes pour tous les groupes
+  var lastSeenMessages = JSON.parse(localStorage.getItem('outnow_last_seen') || '{}');
+
+  setInterval(function() {
+    if (!currentUser) return;
+    sb.from('group_members').select('group_id').eq('user_id', currentUser.id)
+      .then(function(res) {
+        if (res.error || !res.data) return;
+        res.data.forEach(function(row) {
+          var gid = row.group_id;
+          sb.from('group_messages').select('id, user_id, created_at')
+            .eq('group_id', gid)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .then(function(r) {
+              if (r.error || !r.data || r.data.length === 0) return;
+              var last = r.data[0];
+              if (last.user_id === currentUser.id) return;
+              var lastSeen = lastSeenMessages[gid] || '0';
+              if (last.created_at > lastSeen) {
+                var isInGroup = currentGroup && currentGroup.id === gid && groupTab === 'chat';
+                if (!isInGroup) {
+                  setGroupNotif(gid, 'chat', true);
+                } else {
+                  // On est dans le chat, marque comme vu
+                  lastSeenMessages[gid] = last.created_at;
+                  localStorage.setItem('outnow_last_seen', JSON.stringify(lastSeenMessages));
+                }
+              }
+            });
+        });
+      });
+  }, 10000);
+
+  // Marque les messages comme vus quand on entre dans le chat
+  window.markGroupChatSeen = function(groupId) {
+    sb.from('group_messages').select('created_at')
+      .eq('group_id', groupId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .then(function(r) {
+        if (r.data && r.data.length > 0) {
+          lastSeenMessages[groupId] = r.data[0].created_at;
+          localStorage.setItem('outnow_last_seen', JSON.stringify(lastSeenMessages));
+        }
+      });
+  };
 }
 
 function loadProfile(userId) {
