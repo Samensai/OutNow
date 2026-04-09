@@ -80,13 +80,24 @@ function rejectFriendRequest(friendshipId) {
 
 function removeFriend(friendId) {
   if (!confirm('Supprimer cet ami ?')) return;
+  var uid = currentUser.id;
+  // Cherche d'abord la friendship
   sb.from('friendships')
-    .delete()
-    .or(
-      'and(requester_id.eq.' + currentUser.id + ',receiver_id.eq.' + friendId + '),' +
-      'and(requester_id.eq.' + friendId + ',receiver_id.eq.' + currentUser.id + ')'
-    )
-    .then(function() { loadFriends(); });
+    .select('id')
+    .or('and(requester_id.eq.' + uid + ',receiver_id.eq.' + friendId + '),and(requester_id.eq.' + friendId + ',receiver_id.eq.' + uid + ')')
+    .then(function(res) {
+      if (res.error || !res.data || res.data.length === 0) {
+        alert('Amitie introuvable.'); return;
+      }
+      var fid = res.data[0].id;
+      return sb.from('friendships').delete().eq('id', fid);
+    })
+    .then(function() {
+      var existing = document.getElementById('friend-dropdown');
+      if (existing) existing.remove();
+      loadFriends();
+    })
+    .catch(function(err) { console.error(err); alert('Erreur: ' + (err.message || JSON.stringify(err))); });
 }
 
 function createGroupWithFriend(friendId, friendName) {
