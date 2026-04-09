@@ -71,7 +71,6 @@ function rejectFriendRequest(friendshipId) {
 }
 
 function removeFriend(friendId) {
-  if (!confirm('Supprimer cet ami ?')) return;
   var uid = currentUser.id;
   sb.from('friendships')
     .select('id')
