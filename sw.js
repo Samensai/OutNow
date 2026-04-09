@@ -1,10 +1,14 @@
 // sw.js — OutNow Service Worker
-const CACHE = 'outnow-v1';
+const CACHE = 'outnow-v3';
 const ASSETS = [
   '/',
   '/index.html',
   '/css/style.css',
   '/js/app.js',
+  '/js/supabase.js',
+  '/js/auth.js',
+  '/js/friends.js',
+  '/js/groups.js',
   '/data/events.js',
   '/manifest.json',
 ];
@@ -26,14 +30,24 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
-  // Network first for images (fresh content), cache first for app shell
-  if (e.request.destination === 'image') {
+  // Toujours réseau en premier pour les JS et CSS
+  if (e.request.url.match(/\.(js|css)(\?|$)/)) {
     e.respondWith(
-      fetch(e.request).catch(() => caches.match(e.request))
+      fetch(e.request).then(response => {
+        var clone = response.clone();
+        caches.open(CACHE).then(cache => cache.put(e.request, clone));
+        return response;
+      }).catch(() => caches.match(e.request))
     );
-  } else {
-    e.respondWith(
-      caches.match(e.request).then(cached => cached || fetch(e.request))
-    );
+    return;
   }
+  // Images : réseau d'abord
+  if (e.request.destination === 'image') {
+    e.respondWith(fetch(e.request).catch(() => caches.match(e.request)));
+    return;
+  }
+  // Reste : cache first
+  e.respondWith(
+    caches.match(e.request).then(cached => cached || fetch(e.request))
+  );
 });
