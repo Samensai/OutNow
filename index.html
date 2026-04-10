@@ -52,11 +52,46 @@
     </div>
   </div>
 
+  <!-- ── CHOIX DE VILLE ── -->
+  <div id="screen-cities" class="screen">
+    <div class="cities-content">
+      <div class="cities-logo">outnow</div>
+      <h2 class="cities-title">Où veux-tu sortir ?</h2>
+      <p class="cities-sub">Choisis une ou plusieurs villes</p>
+      <div class="cities-grid">
+        <button class="city-btn active" data-city="paris">
+          <span class="city-emoji">🗼</span>
+          <span class="city-name">Paris</span>
+        </button>
+        <button class="city-btn" data-city="bordeaux">
+          <span class="city-emoji">🍷</span>
+          <span class="city-name">Bordeaux</span>
+        </button>
+        <button class="city-btn" data-city="lille">
+          <span class="city-emoji">🏭</span>
+          <span class="city-name">Lille</span>
+        </button>
+        <button class="city-btn" data-city="nantes">
+          <span class="city-emoji">🚀</span>
+          <span class="city-name">Nantes</span>
+        </button>
+        <button class="city-btn" data-city="rennes">
+          <span class="city-emoji">🏰</span>
+          <span class="city-name">Rennes</span>
+        </button>
+      </div>
+      <button class="btn-primary" id="btn-confirm-cities">Découvrir les sorties</button>
+    </div>
+  </div>
+
   <!-- ── HOME ── -->
   <div id="screen-home" class="screen">
     <header class="app-header">
       <div class="header-logo">outnow</div>
       <div class="header-actions">
+        <button class="icon-btn" id="btn-change-cities" title="Changer de ville">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        </button>
         <button class="icon-btn" id="btn-map">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
         </button>
@@ -368,6 +403,36 @@
   });
   document.getElementById('chat-input').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { sendMessage(this.value); this.value = ''; }
+  });
+
+  // ── SÉLECTION DE VILLES ──
+  function initCityScreen() {
+    var savedCities = [];
+    try { savedCities = JSON.parse(localStorage.getItem('outnow_cities') || '[]'); } catch(e) {}
+    if (!savedCities.length) savedCities = ['paris'];
+
+    document.querySelectorAll('.city-btn').forEach(function(btn) {
+      btn.classList.toggle('active', savedCities.indexOf(btn.dataset.city) !== -1);
+      btn.addEventListener('click', function() {
+        btn.classList.toggle('active');
+        // Au moins une ville doit rester sélectionnée
+        var active = document.querySelectorAll('.city-btn.active');
+        if (active.length === 0) btn.classList.add('active');
+      });
+    });
+  }
+
+  document.getElementById('btn-confirm-cities').addEventListener('click', function() {
+    var selected = Array.from(document.querySelectorAll('.city-btn.active')).map(function(b) { return b.dataset.city; });
+    saveSelectedCities(selected);
+    showScreen('home');
+    buildDeck();
+    renderCards();
+  });
+
+  document.getElementById('btn-change-cities').addEventListener('click', function() {
+    initCityScreen();
+    showScreen('cities');
   });
 
   if ('serviceWorker' in navigator) {
