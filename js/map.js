@@ -46,9 +46,8 @@ function renderMapEvents() {
   mapMarkers.forEach(function(m) { mapInstance.removeLayer(m); });
   mapMarkers = [];
 
-  // Utilise MAP_EVENTS (toutes villes) pour la carte
-  var source = (typeof MAP_EVENTS !== 'undefined' && MAP_EVENTS.length > 0) ? MAP_EVENTS : EVENTS;
-  var filtered = source.filter(function(e) {
+  // Utilise EVENTS directement (déjà chargés avec GPS)
+  var filtered = EVENTS.filter(function(e) {
     if (!e.lat || !e.lng) return false;
     if (mapSelectedDate) {
       if (!e.dateISO) return false;
@@ -116,45 +115,49 @@ function openMapScreen() {
     n.classList.remove('active');
   });
 
-  setTimeout(function() {
-    var doInit = function() {
-      initMap();
-      if (mapInstance) mapInstance.invalidateSize();
-    };
-
-    var doGeoAndInit = function() {
-      if (USER_LOCATION) {
-        doInit();
-      } else {
-        requestUserLocation().then(function() {
-          EVENTS.forEach(function(e) {
-            if (e.lat && e.lng && USER_LOCATION) {
-              e.distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, e.lat, e.lng);
-              e.distance = formatDistance(e.distanceKm);
-            }
-          });
-          doInit();
-        });
-      }
-    };
-
-    // Charge les events carte si pas encore fait, puis init
-    if (typeof loadMapEvents === 'function' && MAP_EVENTS.length === 0 && !MAP_LOADING) {
-      loadMapEvents().then(function() {
-        doGeoAndInit();
-      });
-    } else if (MAP_LOADING) {
-      // Attend que le chargement soit fini
-      var wait = setInterval(function() {
-        if (!MAP_LOADING) {
-          clearInterval(wait);
-          doGeoAndInit();
-        }
-      }, 300);
-    } else {
-      doGeoAndInit();
+  var doInit = function() {
+    var loadingEl = document.getElementById('map-loading');
+    if (loadingEl) loadingEl.style.display = 'none';
+    initMap();
+    if (mapInstance) {
+      mapInstance.invalidateSize();
+      renderMapEvents();
     }
-  }, 100);
+  };
+
+  var doGeoAndInit = function() {
+    if (USER_LOCATION) {
+      doInit();
+    } else {
+      requestUserLocation().then(function() {
+        EVENTS.forEach(function(e) {
+          if (e.lat && e.lng && USER_LOCATION) {
+            e.distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, e.lat, e.lng);
+            e.distance = formatDistance(e.distanceKm);
+          }
+        });
+        doInit();
+      });
+    }
+  };
+
+  // Charge TOUS les events puis affiche la carte
+  function loadAll() {
+    if (EVENTS_EXHAUSTED) {
+      setTimeout(doGeoAndInit, 100);
+      return;
+    }
+    loadEvents().then(function() {
+      buildDeck();
+      if (!EVENTS_EXHAUSTED) {
+        loadAll();
+      } else {
+        doGeoAndInit();
+      }
+    });
+  }
+
+  loadAll();
 }
 
 // Filtre par date
