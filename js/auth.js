@@ -36,15 +36,8 @@ function startApp() {
   if (appStarted) return;
   appStarted = true;
 
-  // Charge les likes sauvegardés
-  var savedLikes = localStorage.getItem('outnow_liked_events');
-  if (savedLikes) { try { state.liked = JSON.parse(savedLikes); } catch(e) {} }
-
   showScreen('home');
-  // Demande la géolocalisation puis charge les events
-  requestUserLocation().then(function() {
-    loadEvents().then(function() { buildDeck(); renderCards(); });
-  });
+  loadEvents().then(function() { buildDeck(); renderCards(); });
   updateProfileUI();
 
   // Vérifie les notifs après que la nav soit visible
