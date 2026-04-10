@@ -41,7 +41,10 @@ function startApp() {
   if (savedLikes) { try { state.liked = JSON.parse(savedLikes); } catch(e) {} }
 
   showScreen('home');
-  loadEvents().then(function() { buildDeck(); renderCards(); });
+  // Demande la géolocalisation puis charge les events
+  requestUserLocation().then(function() {
+    loadEvents().then(function() { buildDeck(); renderCards(); });
+  });
   updateProfileUI();
 
   // Vérifie les notifs après que la nav soit visible
