@@ -46,7 +46,9 @@ function renderMapEvents() {
   mapMarkers.forEach(function(m) { mapInstance.removeLayer(m); });
   mapMarkers = [];
 
-  var filtered = EVENTS.filter(function(e) {
+  // Utilise MAP_EVENTS (toutes villes) pour la carte
+  var source = (typeof MAP_EVENTS !== 'undefined' && MAP_EVENTS.length > 0) ? MAP_EVENTS : EVENTS;
+  var filtered = source.filter(function(e) {
     if (!e.lat || !e.lng) return false;
     if (mapSelectedDate) {
       if (!e.dateISO) return false;
@@ -114,6 +116,10 @@ function openMapScreen() {
     n.classList.remove('active');
   });
 
+  // Charge les events carte si pas encore fait
+  if (typeof loadMapEvents === 'function' && MAP_EVENTS.length === 0 && !MAP_LOADING) {
+    loadMapEvents();
+  }
   // Demande la géoloc si pas encore fait, puis init la carte
   setTimeout(function() {
     if (USER_LOCATION) {
