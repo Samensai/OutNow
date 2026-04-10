@@ -4,7 +4,7 @@ var state = {
   events: [],
   deck: [],
   disliked: [],
-  currentFilter: { cat: 'all', distance: 50, budget: 999 },
+  currentFilter: { cat: 'all', distance: 999, budget: 999 },
   liked: [],
   currentDetail: null,
 };
@@ -48,9 +48,9 @@ function buildDeck() {
     var notInDeck = deckIds.indexOf(e.id) === -1;
     var matchCat = cat === 'all' || e.category === cat;
     var matchBudget = e.price <= budget;
-    // Filtre distance réel si géoloc disponible
+    // Filtre distance réel si géoloc disponible et coordonnées connues
     var matchDist = true;
-    if (USER_LOCATION && e.distanceKm !== null) {
+    if (USER_LOCATION && e.distanceKm !== null && e.distanceKm !== undefined && maxDist < 999) {
       matchDist = e.distanceKm <= maxDist;
     }
     return notLiked && notDisliked && notInDeck && matchCat && matchBudget && matchDist;
@@ -238,8 +238,8 @@ function closeFilter() {
 
 $('filter-distance') && $('filter-distance').addEventListener('input', function() {
   var val = parseInt(this.value);
-  $('filter-distance-val').textContent = val + ' km';
-  state.currentFilter.distance = val;
+  $('filter-distance-val').textContent = val >= 50 ? 'Tous' : val + ' km';
+  state.currentFilter.distance = val >= 50 ? 999 : val;
 });
 
 document.querySelectorAll('.budget-pill').forEach(function(p) {
