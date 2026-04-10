@@ -36,8 +36,18 @@ function startApp() {
   if (appStarted) return;
   appStarted = true;
 
-  showScreen('home');
-  loadEvents().then(function() { buildDeck(); renderCards(); });
+  // Vérifie si l'utilisateur a déjà choisi ses villes
+  var hasCities = false;
+  try { hasCities = !!localStorage.getItem('outnow_cities'); } catch(e) {}
+
+  if (!hasCities) {
+    // Premier lancement : montre l'écran de sélection de ville
+    initCityScreen();
+    showScreen('cities');
+  } else {
+    showScreen('home');
+    loadEvents().then(function() { buildDeck(); renderCards(); });
+  }
   updateProfileUI();
 
   // Vérifie les notifs après que la nav soit visible
