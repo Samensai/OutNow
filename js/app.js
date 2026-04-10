@@ -1,13 +1,15 @@
-// js/app.js — OutNow PWA (sans init, geree par index.html)
+// js/app.js — OutNow PWA
 
 var state = {
   events: [],
   deck: [],
   disliked: [],
-  currentFilter: { cat: 'all', distance: 15, budget: 999, when: 'today' },
+  currentFilter: { cat: 'all', distance: 50, budget: 999 },
   liked: [],
   currentDetail: null,
 };
+
+var previousScreen = 'home';
 
 var $ = function(id) { return document.getElementById(id); };
 var cardStack = $('card-stack');
@@ -22,9 +24,22 @@ function showScreen(name) {
   if (target) target.classList.add('active');
 }
 
+function goBack() {
+  if (previousScreen === 'group-detail') {
+    showScreen('group-detail');
+  } else if (previousScreen === 'map') {
+    showScreen('map');
+    setTimeout(function() { if (mapInstance) mapInstance.invalidateSize(); }, 100);
+  } else {
+    showScreen('home');
+  }
+  previousScreen = 'home';
+}
+
 function buildDeck() {
   var cat = state.currentFilter.cat;
   var budget = state.currentFilter.budget;
+  var maxDist = state.currentFilter.distance;
   var deckIds = state.deck.map(function(e) { return e.id; });
 
   var newEvents = EVENTS.filter(function(e) {
@@ -33,8 +48,22 @@ function buildDeck() {
     var notInDeck = deckIds.indexOf(e.id) === -1;
     var matchCat = cat === 'all' || e.category === cat;
     var matchBudget = e.price <= budget;
-    return notLiked && notDisliked && notInDeck && matchCat && matchBudget;
+    // Filtre distance réel si géoloc disponible
+    var matchDist = true;
+    if (USER_LOCATION && e.distanceKm !== null) {
+      matchDist = e.distanceKm <= maxDist;
+    }
+    return notLiked && notDisliked && notInDeck && matchCat && matchBudget && matchDist;
   });
+
+  // Trie par distance si géoloc dispo
+  if (USER_LOCATION) {
+    newEvents.sort(function(a, b) {
+      var da = a.distanceKm !== null ? a.distanceKm : 999;
+      var db = b.distanceKm !== null ? b.distanceKm : 999;
+      return da - db;
+    });
+  }
 
   newEvents.forEach(function(e) { state.deck.push(e); });
 }
@@ -47,7 +76,7 @@ function renderCards() {
       loadEvents().then(function() { buildDeck(); renderCards(); });
       return;
     }
-    cardStack.innerHTML = '<div class="card-empty"><div class="empty-emoji">😴</div><h3>Plus de sorties !</h3><p style="color:var(--text3);font-size:14px;margin-top:8px">Reviens plus tard.</p></div>';
+    cardStack.innerHTML = '<div class="card-empty"><div class="empty-emoji">😴</div><h3>Plus de sorties !</h3><p style="color:var(--text3);font-size:14px;margin-top:8px">Change tes filtres ou reviens plus tard.</p></div>';
     return;
   }
   state.deck.slice(0, 3).forEach(function(ev, i) {
@@ -85,7 +114,7 @@ function createCard(ev, idx) {
       '</div>' +
     '</div>';
   div.addEventListener('click', function() {
-    if (Math.abs(div._dragX || 0) < 5) openDetail(ev);
+    if (Math.abs(div._dragX || 0) < 5) { previousScreen = 'home'; openDetail(ev); }
   });
   return div;
 }
@@ -147,6 +176,7 @@ function swipeCard(direction, card, ev) {
   card.style.opacity = '0';
   if (direction === 'like') {
     state.liked.push(ev);
+    try { localStorage.setItem('outnow_liked_events', JSON.stringify(state.liked)); } catch(e) {}
   } else {
     state.disliked.push(ev.id);
   }
@@ -205,10 +235,13 @@ function closeFilter() {
   filterPanel.classList.add('hidden');
   panelOverlay.classList.add('hidden');
 }
+
 $('filter-distance') && $('filter-distance').addEventListener('input', function() {
-  $('filter-distance-val').textContent = this.value + ' km';
-  state.currentFilter.distance = parseInt(this.value);
+  var val = parseInt(this.value);
+  $('filter-distance-val').textContent = val + ' km';
+  state.currentFilter.distance = val;
 });
+
 document.querySelectorAll('.budget-pill').forEach(function(p) {
   p.addEventListener('click', function() {
     p.closest('.budget-pills').querySelectorAll('.budget-pill').forEach(function(x) { x.classList.remove('active'); });
@@ -226,12 +259,10 @@ function openDetail(ev) {
       '<div class="detail-tags">' + ev.tags.map(function(t) { return '<span class="detail-tag">' + t + '</span>'; }).join('') + '</div>' +
       '<div class="detail-title">' + ev.title + '</div>' +
       '<div class="detail-meta-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' + ev.date + '</div>' +
-      '<div class="detail-meta-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>' + ev.location + '</div>' +
+      '<div class="detail-meta-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>' + ev.location + (ev.distance !== 'Paris' ? ' · ' + ev.distance : '') + '</div>' +
       '<div class="detail-desc">' + ev.description + '</div>' +
       '<div class="detail-price-badge">' + ev.priceLabel + '</div>' +
-      '<div class="detail-cta">' +
-        '<button class="btn-primary" onclick="likeFromDetail(' + ev.id + ')">❤️ Sauvegarder</button>' +
-      '</div>' +
+      '<div class="detail-cta"><button class="btn-primary" onclick="likeFromDetail(' + ev.id + ')">' + (isLiked ? '❤️ Sauvegarde' : '🤍 Sauvegarder') + '</button></div>' +
     '</div>';
   showScreen('detail');
 }
@@ -241,35 +272,30 @@ window.likeFromDetail = function(id) {
   if (!ev || state.liked.find(function(l) { return l.id === id; })) return;
   state.liked.push(ev);
   state.deck = state.deck.filter(function(e) { return e.id !== id; });
-  showScreen('home');
+  try { localStorage.setItem('outnow_liked_events', JSON.stringify(state.liked)); } catch(e) {}
+  openDetail(ev);
 };
 
 function renderLikes() {
   if (!likesGrid) return;
-  if (state.liked.length === 0) {
+  var savedLikes = state.liked;
+  if (savedLikes.length === 0) {
     likesGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--text2)"><div style="font-size:48px;margin-bottom:16px">❤️</div><div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:8px">Pas encore de likes</div></div>';
     return;
   }
-  likesGrid.innerHTML = state.liked.map(function(ev) {
+  var now = new Date();
+  likesGrid.innerHTML = savedLikes.map(function(ev) {
+    var isPast = ev.dateISO && new Date(ev.dateISO) < now;
     return '<div class="like-item" onclick="openLikeDetail(' + ev.id + ')">' +
       '<img src="' + ev.image + '" alt="' + ev.title + '" loading="lazy" />' +
+      (isPast ? '<div class="like-past-badge">Passe</div>' : '') +
       '<div class="like-item-info"><div class="like-item-title">' + ev.title + '</div><div class="like-item-date">' + ev.date + '</div></div>' +
     '</div>';
   }).join('');
 }
 
 window.openLikeDetail = function(id) {
-  var ev = EVENTS.find(function(e) { return e.id === id; });
-  if (ev) openDetail(ev);
+  var ev = EVENTS.find(function(e) { return e.id === id; }) ||
+           state.liked.find(function(e) { return e.id === id; });
+  if (ev) { previousScreen = 'likes'; openDetail(ev); }
 };
-
-// Fix retour depuis detail
-var previousScreen = 'home';
-function goBack() {
-  if (typeof previousScreen !== 'undefined' && previousScreen === 'group-detail') {
-    showScreen('group-detail');
-  } else {
-    showScreen('home');
-  }
-  previousScreen = 'home';
-}
