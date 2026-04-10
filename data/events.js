@@ -242,5 +242,105 @@ function fallbackImage(i) {
   return imgs[i % imgs.length];
 }
 
+// Tous les agendas toutes villes confondues (pour la carte)
+var ALL_AGENDAS_UIDS = [];
+Object.keys(CITIES).forEach(function(city) {
+  CITIES[city].agendas.forEach(function(uid) {
+    if (ALL_AGENDAS_UIDS.indexOf(uid) === -1) ALL_AGENDAS_UIDS.push(uid);
+  });
+});
+
+// Charge TOUS les events pour la carte (toutes villes)
+var MAP_EVENTS = [];
+var MAP_SEEN_IDS = {};
+var MAP_LOADING = false;
+var MAP_EXHAUSTED = false;
+var MAP_AGENDAS = [];
+
+function buildMapAgendaList() {
+  MAP_AGENDAS = ALL_AGENDAS_UIDS.map(function(uid) {
+    return { uid: uid, cursor: null, done: false };
+  });
+}
+
+function loadMapEvents() {
+  if (MAP_LOADING || MAP_EXHAUSTED) return Promise.resolve();
+  if (MAP_AGENDAS.length === 0) buildMapAgendaList();
+  MAP_LOADING = true;
+
+  var now = new Date();
+  var active = MAP_AGENDAS.filter(function(a) { return !a.done; });
+  if (active.length === 0) {
+    MAP_EXHAUSTED = true; MAP_LOADING = false;
+    return Promise.resolve();
+  }
+
+  var promises = active.map(function(agenda) {
+    var url = 'https://api.openagenda.com/v2/agendas/' + agenda.uid + '/events'
+      + '?key=' + OPENAGENDA_KEY
+      + '&size=20&lang=fr&timings[gte]=' + TODAY;
+    if (agenda.cursor) {
+      agenda.cursor.forEach(function(val) { url += '&after[]=' + encodeURIComponent(val); });
+    }
+    return fetch(url, { headers: { 'Accept': 'application/json' } })
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
+        if (data.after && data.after.length > 0) agenda.cursor = data.after;
+        else agenda.done = true;
+        return data.events || [];
+      })
+      .catch(function() { agenda.done = true; return []; });
+  });
+
+  return Promise.all(promises).then(function(results) {
+    var all = [];
+    results.forEach(function(evts) { all = all.concat(evts); });
+    all.forEach(function(e) {
+      if (MAP_SEEN_IDS[e.uid]) return;
+      if (!e.location || !e.location.latitude || !e.location.longitude) return;
+      var timing = e.firstTiming || e.nextTiming || e.lastTiming;
+      if (timing && timing.begin && new Date(timing.begin) < now) return;
+      MAP_SEEN_IDS[e.uid] = true;
+      var title = (e.title && (e.title.fr || e.title.en)) || 'Evenement';
+      var desc = (e.description && (e.description.fr || e.description.en)) || '';
+      var keywords = [];
+      if (e.keywords && e.keywords.fr) {
+        keywords = Array.isArray(e.keywords.fr) ? e.keywords.fr : [e.keywords.fr];
+      }
+      var dateISO = null;
+      var dateStr = 'Prochainement';
+      if (timing && timing.begin) {
+        dateISO = timing.begin;
+        var d = new Date(timing.begin);
+        dateStr = d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+      }
+      var priceInfo = detectPrice(e);
+      var image = fallbackImage(Object.keys(MAP_SEEN_IDS).length);
+      if (e.image && e.image.base && e.image.filename) image = e.image.base + e.image.filename;
+      MAP_EVENTS.push({
+        id: e.uid,
+        title: title,
+        category: detectCategory(keywords, title, desc),
+        tags: keywords.slice(0, 3),
+        date: dateStr,
+        dateISO: dateISO,
+        location: (e.location.name || e.location.city || ''),
+        lat: e.location.latitude,
+        lng: e.location.longitude,
+        distance: e.location.city || '',
+        distanceKm: null,
+        price: priceInfo.price,
+        priceLabel: priceInfo.priceLabel,
+        image: image,
+        description: desc
+      });
+    });
+    if (MAP_AGENDAS.every(function(a) { return a.done; })) MAP_EXHAUSTED = true;
+    MAP_LOADING = false;
+    console.log('OutNow carte: ' + MAP_EVENTS.length + ' evenements avec GPS');
+  });
+}
+
 // Init
 buildAgendaList();
+buildMapAgendaList();
