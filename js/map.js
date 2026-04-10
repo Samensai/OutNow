@@ -21,10 +21,19 @@ function initMap() {
   // Centre sur la position de l'utilisateur si dispo
   if (USER_LOCATION) {
     mapInstance.setView([USER_LOCATION.lat, USER_LOCATION.lng], 13);
-    L.circleMarker([USER_LOCATION.lat, USER_LOCATION.lng], {
-      radius: 8, fillColor: '#ff3b5c', color: '#fff',
-      weight: 2, fillOpacity: 1
-    }).addTo(mapInstance).bindPopup('Vous êtes ici');
+    // Marqueur "vous êtes ici" - pulsant et distinct
+  var userIcon = L.divIcon({
+    html: '<div style="position:relative;width:24px;height:24px">' +
+      '<div style="position:absolute;inset:0;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(59,130,246,0.6)"></div>' +
+      '<div style="position:absolute;inset:-6px;background:rgba(59,130,246,0.2);border-radius:50%;animation:pulse 2s infinite"></div>' +
+    '</div>',
+    className: '',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12]
+  });
+  L.marker([USER_LOCATION.lat, USER_LOCATION.lng], { icon: userIcon, zIndexOffset: 1000 })
+    .addTo(mapInstance)
+    .bindPopup('<b>Vous êtes ici</b>');
   }
 
   renderMapEvents();
@@ -105,10 +114,24 @@ function openMapScreen() {
     n.classList.remove('active');
   });
 
-  // Init carte après que l'écran soit visible
+  // Demande la géoloc si pas encore fait, puis init la carte
   setTimeout(function() {
-    initMap();
-    if (mapInstance) mapInstance.invalidateSize();
+    if (USER_LOCATION) {
+      initMap();
+      if (mapInstance) mapInstance.invalidateSize();
+    } else {
+      requestUserLocation().then(function() {
+        // Recalcule les distances maintenant qu'on a la position
+        EVENTS.forEach(function(e) {
+          if (e.lat && e.lng && USER_LOCATION) {
+            e.distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, e.lat, e.lng);
+            e.distance = formatDistance(e.distanceKm);
+          }
+        });
+        initMap();
+        if (mapInstance) mapInstance.invalidateSize();
+      });
+    }
   }, 100);
 }
 
