@@ -53,7 +53,7 @@
   </div>
 
   <!-- ── CHOIX DE VILLE ── -->
-  <div id="screen-cities" class="screen">
+  <div id="screen-cities" class="screen" style="overflow-y:auto;-webkit-overflow-scrolling:touch;">
     <div class="cities-content">
       <div class="cities-logo">outnow</div>
       <h2 class="cities-title">Où veux-tu sortir ?</h2>
@@ -424,10 +424,16 @@
 
   document.getElementById('btn-confirm-cities').addEventListener('click', function() {
     var selected = Array.from(document.querySelectorAll('.city-btn.active')).map(function(b) { return b.dataset.city; });
+    // Reset complet
     saveSelectedCities(selected);
+    state.deck = [];
+    state.disliked = [];
     showScreen('home');
-    buildDeck();
-    renderCards();
+    // Recharge tous les events depuis zero
+    loadEvents().then(function() {
+      buildDeck();
+      renderCards();
+    });
   });
 
   document.getElementById('btn-change-cities').addEventListener('click', function() {
