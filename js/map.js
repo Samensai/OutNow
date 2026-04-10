@@ -116,27 +116,43 @@ function openMapScreen() {
     n.classList.remove('active');
   });
 
-  // Charge les events carte si pas encore fait
-  if (typeof loadMapEvents === 'function' && MAP_EVENTS.length === 0 && !MAP_LOADING) {
-    loadMapEvents();
-  }
-  // Demande la géoloc si pas encore fait, puis init la carte
   setTimeout(function() {
-    if (USER_LOCATION) {
+    var doInit = function() {
       initMap();
       if (mapInstance) mapInstance.invalidateSize();
-    } else {
-      requestUserLocation().then(function() {
-        // Recalcule les distances maintenant qu'on a la position
-        EVENTS.forEach(function(e) {
-          if (e.lat && e.lng && USER_LOCATION) {
-            e.distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, e.lat, e.lng);
-            e.distance = formatDistance(e.distanceKm);
-          }
+    };
+
+    var doGeoAndInit = function() {
+      if (USER_LOCATION) {
+        doInit();
+      } else {
+        requestUserLocation().then(function() {
+          EVENTS.forEach(function(e) {
+            if (e.lat && e.lng && USER_LOCATION) {
+              e.distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, e.lat, e.lng);
+              e.distance = formatDistance(e.distanceKm);
+            }
+          });
+          doInit();
         });
-        initMap();
-        if (mapInstance) mapInstance.invalidateSize();
+      }
+    };
+
+    // Charge les events carte si pas encore fait, puis init
+    if (typeof loadMapEvents === 'function' && MAP_EVENTS.length === 0 && !MAP_LOADING) {
+      loadMapEvents().then(function() {
+        doGeoAndInit();
       });
+    } else if (MAP_LOADING) {
+      // Attend que le chargement soit fini
+      var wait = setInterval(function() {
+        if (!MAP_LOADING) {
+          clearInterval(wait);
+          doGeoAndInit();
+        }
+      }, 300);
+    } else {
+      doGeoAndInit();
     }
   }, 100);
 }
