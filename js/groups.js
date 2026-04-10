@@ -282,40 +282,72 @@ function renderMessages() {
 }
 
 function subscribeToGroup(groupId) {
-  if (messagesSubscription) { try { messagesSubscription.unsubscribe(); } catch(e) {} }
-  if (swipesSubscription) { try { swipesSubscription.unsubscribe(); } catch(e) {} }
-  if (pollingInterval) clearInterval(pollingInterval);
+  if (messagesSubscription) {
+    try { messagesSubscription.unsubscribe(); } catch (e) {}
+  }
+
+  if (swipesSubscription) {
+    try { swipesSubscription.unsubscribe(); } catch (e) {}
+  }
+
+  if (pollingInterval) {
+    clearInterval(pollingInterval);
+  }
 
   messagesSubscription = sb.channel('msg-' + groupId)
     .on('postgres_changes', {
-      event: 'INSERT', schema: 'public', table: 'group_messages',
+      event: 'INSERT',
+      schema: 'public',
+      table: 'group_messages',
       filter: 'group_id=eq.' + groupId
     }, function(payload) {
       if (payload.new.user_id !== currentUser.id) {
-        groupMessages.push(payload.new);
-        if (groupTab === 'chat') renderMessages();
-        else setGroupNotif(groupId, 'chat', true);
+        sb.from('profiles')
+          .select('username')
+          .eq('id', payload.new.user_id)
+          .single()
+          .then(function(profileRes) {
+            var msg = payload.new;
+            msg.profiles = profileRes.data || { username: '?' };
+            groupMessages.push(msg);
+
+            if (groupTab === 'chat') {
+              renderMessages();
+            } else {
+              setGroupNotif(groupId, 'chat', true);
+            }
+          });
       }
-    }).subscribe();
+    })
+    .subscribe();
 
   swipesSubscription = sb.channel('swp-' + groupId)
     .on('postgres_changes', {
-      event: 'INSERT', schema: 'public', table: 'group_swipes',
+      event: 'INSERT',
+      schema: 'public',
+      table: 'group_swipes',
       filter: 'group_id=eq.' + groupId
     }, function(payload) {
       var s = payload.new;
       if (!groupSwipes[s.event_id]) groupSwipes[s.event_id] = [];
       groupSwipes[s.event_id].push(s);
       if (groupTab === 'matches') renderGroupMatches();
-    }).subscribe();
+    })
+    .subscribe();
 
   pollingInterval = setInterval(function() {
-    if (!currentGroup) { clearInterval(pollingInterval); return; }
-    if (groupTab === 'chat') loadGroupMessages(currentGroup.id);
-    else if (groupTab === 'matches') loadGroupSwipes(currentGroup.id);
+    if (!currentGroup) {
+      clearInterval(pollingInterval);
+      return;
+    }
+
+    if (groupTab === 'chat') {
+      loadGroupMessages(currentGroup.id);
+    } else if (groupTab === 'matches') {
+      loadGroupSwipes(currentGroup.id);
+    }
   }, 3000);
 }
-
 // ── SWIPE ──
 function loadGroupSwipes(groupId) {
   sb.from('group_swipes').select('*').eq('group_id', groupId)

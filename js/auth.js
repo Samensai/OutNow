@@ -48,12 +48,34 @@ function startApp() {
     showScreen('home');
     loadEvents().then(function() { buildDeck(); renderCards(); });
   }
+
   updateProfileUI();
+
+  if (typeof updatePushButtonUI === 'function') {
+    updatePushButtonUI();
+  }
+
+  if (
+    typeof syncPushSubscription === 'function' &&
+    'Notification' in window &&
+    Notification.permission === 'granted'
+  ) {
+    syncPushSubscription()
+      .then(function() {
+        if (typeof updatePushButtonUI === 'function') updatePushButtonUI();
+      })
+      .catch(function(err) {
+        console.error('syncPushSubscription error:', err);
+      });
+  }
 
   // Vérifie les notifs après que la nav soit visible
   setTimeout(function() {
     loadPendingRequests();
     loadUserGroups();
+    if (typeof tryHandleCurrentUrlPushRoute === 'function') {
+      tryHandleCurrentUrlPushRoute();
+    }
   }, 800);
 
   // Polling notifs toutes les 30 secondes
@@ -110,7 +132,6 @@ function startApp() {
       });
   };
 }
-
 function loadProfile(userId) {
   return sb.from('profiles').select('*').eq('id', userId).single()
     .then(function(res) { return res.data; });
