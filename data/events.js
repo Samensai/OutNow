@@ -4,7 +4,7 @@ var EVENTS_EXHAUSTED = false;
 var SEEN_IDS = {};
 var USER_LOCATION = null; // { lat, lng }
 
-var OPENAGENDA_KEY = "TA_CLE_ICI";
+var OPENAGENDA_KEY = "6cf33cc591df40a9b0fac2a946d4c3ec";
 var TODAY = new Date().toISOString().split('T')[0];
 
 var AGENDAS = [
