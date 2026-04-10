@@ -1,11 +1,18 @@
 // js/app.js — OutNow PWA
 
+// Charge les likes depuis localStorage dès le départ
+var savedLikesInit = [];
+try {
+  var raw = localStorage.getItem('outnow_liked_events');
+  if (raw) savedLikesInit = JSON.parse(raw);
+} catch(e) {}
+
 var state = {
   events: [],
   deck: [],
   disliked: [],
   currentFilter: { cat: 'all', distance: 999, budget: 999 },
-  liked: [],
+  liked: savedLikesInit,
   currentDetail: null,
 };
 
