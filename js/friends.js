@@ -101,19 +101,29 @@ function createGroupWithFriend(friendId, friendName) {
   document.querySelectorAll('.nav-item').forEach(function(n) {
     n.classList.toggle('active', n.dataset.screen === 'groups');
   });
+
   if (typeof loadUserGroups === 'function') loadUserGroups();
+
   setTimeout(function() {
     var picker = document.getElementById('friend-picker');
-    if (!picker) return;
+    var citySelect = document.getElementById('new-group-city');
+
+    if (!picker || !citySelect) return;
+
+    citySelect.innerHTML = (SELECTED_CITIES || []).map(function(cityKey) {
+      var label = CITIES[cityKey] ? CITIES[cityKey].label : cityKey;
+      return '<option value="' + cityKey + '">' + label + '</option>';
+    }).join('');
+
     picker.innerHTML = friendsList.map(function(f) {
       return '<label class="friend-pick-item">' +
         '<input type="checkbox" value="' + f.id + '"' + (f.id === friendId ? ' checked' : '') + ' /> ' + f.username +
       '</label>';
     }).join('') || '<div class="empty-state">Ajoute des amis d\'abord !</div>';
+
     document.getElementById('create-group-modal').classList.remove('hidden');
   }, 100);
 }
-
 function renderFriendsList() {
   var el = document.getElementById('friends-list');
   if (!el) return;
