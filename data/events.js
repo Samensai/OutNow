@@ -54,12 +54,12 @@ function buildAgendaList() {
   var seenAgendaIds = {};
   AGENDAS = [];
 
-  SELECTED_CITIES.forEach(function(city) {
-    if (!CITIES[city]) return;
-    CITIES[city].agendas.forEach(function(uid) {
+  SELECTED_CITIES.forEach(function(cityKey) {
+    if (!CITIES[cityKey]) return;
+    CITIES[cityKey].agendas.forEach(function(uid) {
       if (seenAgendaIds[uid]) return;
       seenAgendaIds[uid] = true;
-      AGENDAS.push({ uid: uid, cursor: null, done: false });
+      AGENDAS.push({ uid: uid, cityKey: cityKey, cursor: null, done: false });
     });
   });
 }
@@ -150,7 +150,7 @@ function detectPrice(e) {
   return { price: 0, priceLabel: 'Voir détails' };
 }
 
-function toEventCard(e, indexOffset) {
+function toEventCard(e, indexOffset, cityKey) {
   var title = (e.title && (e.title.fr || e.title.en)) || 'Evenement';
   var desc = (e.description && (e.description.fr || e.description.en)) || '';
   var loc = (e.location && (e.location.name || e.location.city)) || '';
@@ -207,6 +207,7 @@ function toEventCard(e, indexOffset) {
     lat: lat,
     lng: lng,
     city: city,
+    cityKey: cityKey || e.__cityKey || null,
     distance: distanceLabel,
     distanceKm: distanceKm,
     price: priceInfo.price,
@@ -250,7 +251,11 @@ function loadEvents() {
       .then(function(data) {
         if (data.after && data.after.length > 0) agenda.cursor = data.after;
         else agenda.done = true;
-        return data.events || [];
+      
+        return (data.events || []).map(function(evt) {
+          evt.__cityKey = agenda.cityKey;
+          return evt;
+        });
       })
       .catch(function() {
         agenda.done = true;
@@ -279,7 +284,7 @@ function loadEvents() {
           return true;
         })
         .map(function(e, i) {
-          return toEventCard(e, EVENTS.length + i);
+          return toEventCard(e, EVENTS.length + i, e.__cityKey);
         });
 
       if (USER_LOCATION) {
