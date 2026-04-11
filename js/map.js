@@ -1,5 +1,3 @@
-// js/map.js — Carte Leaflet OutNow
-
 var mapInstance = null;
 var mapMarkers = [];
 var mapSelectedDate = null;
@@ -42,7 +40,7 @@ function getMapSourceEvents() {
     merged.push(ev);
   });
 
-  if (state && Array.isArray(state.liked)) {
+  if (typeof state !== 'undefined' && state && Array.isArray(state.liked)) {
     state.liked.forEach(function(ev) {
       if (!ev || !ev.id) return;
       if (seen[String(ev.id)]) return;
@@ -158,7 +156,9 @@ function renderMapEvents() {
 
 window.openDetailFromMap = function(eventId) {
   var sourceEvents = getMapSourceEvents();
-  var ev = sourceEvents.find(function(e) { return String(e.id) === String(eventId); });
+  var ev = sourceEvents.find(function(e) {
+    return String(e.id) === String(eventId);
+  });
   if (!ev) return;
   previousScreen = 'map';
   openDetail(ev);
@@ -232,7 +232,19 @@ function setMapDate(dateStr) {
 document.addEventListener('DOMContentLoaded', function() {
   var btnSearchHere = document.getElementById('btn-map-search-here');
   if (btnSearchHere) {
-    btnSearchHere.addEventListener('click', function() {
+    btnSearchHere.setAttribute('type', 'button');
+
+    btnSearchHere.addEventListener('mousedown', function(e) {
+      e.preventDefault();
+    });
+
+    btnSearchHere.addEventListener('touchstart', function(e) {
+      e.preventDefault();
+    }, { passive: false });
+
+    btnSearchHere.addEventListener('click', function(e) {
+      e.preventDefault();
+      btnSearchHere.blur();
       renderMapEvents();
     });
   }
