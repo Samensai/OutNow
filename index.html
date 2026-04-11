@@ -113,9 +113,6 @@
       <button class="action-btn dislike" id="btn-dislike">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
-      <button class="action-btn super" id="btn-super">
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-      </button>
       <button class="action-btn like" id="btn-like">
         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
       </button>
@@ -167,8 +164,13 @@
       <div class="modal-content">
         <h2 style="margin-bottom:16px">Nouveau groupe</h2>
         <input type="text" id="new-group-name" placeholder="Nom du groupe" class="text-input" style="margin-bottom:12px" />
+    
+        <div class="section-label" style="margin-bottom:8px">Ville du groupe</div>
+        <select id="new-group-city" class="text-input" style="margin-bottom:12px"></select>
+    
         <div class="section-label" style="margin-bottom:8px">Ajouter des amis</div>
         <div id="friend-picker" style="margin-bottom:16px"></div>
+    
         <button class="btn-primary" id="btn-confirm-group">Creer le groupe</button>
         <button class="btn-ghost" onclick="document.getElementById('create-group-modal').classList.add('hidden')">Annuler</button>
       </div>
@@ -368,8 +370,10 @@
   });
 
   document.getElementById('btn-back-group-detail').addEventListener('click', function() {
-    if (pollingInterval) clearInterval(pollingInterval);
     showScreen('groups');
+    document.querySelectorAll('.nav-item').forEach(function(n) {
+      n.classList.toggle('active', n.dataset.screen === 'groups');
+    });
     loadUserGroups();
   });
 
@@ -383,21 +387,35 @@
     document.getElementById('match-modal').classList.add('hidden');
   });
 
-  document.getElementById('btn-new-group').addEventListener('click', function() {
-    var picker = document.getElementById('friend-picker');
-    picker.innerHTML = friendsList.map(function(f) {
-      return '<label class="friend-pick-item"><input type="checkbox" value="' + f.id + '" /> ' + f.username + '</label>';
-    }).join('') || '<div class="empty-state">Ajoute des amis d\'abord !</div>';
-    document.getElementById('create-group-modal').classList.remove('hidden');
-  });
+document.getElementById('btn-new-group').addEventListener('click', function() {
+  var picker = document.getElementById('friend-picker');
+  var citySelect = document.getElementById('new-group-city');
+  citySelect.innerHTML = (SELECTED_CITIES || []).map(function(cityKey) {
+    var label = CITIES[cityKey] ? CITIES[cityKey].label : cityKey;
+    return '<option value="' + cityKey + '">' + label + '</option>';
+  }).join('');
+
+  picker.innerHTML = friendsList.map(function(f) {
+    return '<label class="friend-pick-item"><input type="checkbox" value="' + f.id + '" /> ' + f.username + '</label>';
+  }).join('') || '<div class="empty-state">Ajoute des amis d\'abord !</div>';
+
+  document.getElementById('create-group-modal').classList.remove('hidden');
+});
+
 
   document.getElementById('btn-confirm-group').addEventListener('click', function() {
     var name = document.getElementById('new-group-name').value.trim();
+    var city = document.getElementById('new-group-city').value;
+  
     if (!name) { alert('Donne un nom au groupe !'); return; }
+    if (!city) { alert('Choisis une ville !'); return; }
+  
     var checked = document.querySelectorAll('#friend-picker input:checked');
     var memberIds = Array.from(checked).map(function(c) { return c.value; });
+  
     document.getElementById('create-group-modal').classList.add('hidden');
     document.getElementById('new-group-name').value = '';
+  
     createGroup(name, memberIds, city);
   });
 
