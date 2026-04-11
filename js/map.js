@@ -1,14 +1,33 @@
-// js/map.js — Carte Leaflet OutNow
-
 var mapInstance = null;
 var mapMarkers = [];
 var mapSelectedDate = null;
+var mapSearchInZonePending = false;
+var mapUserMarker = null;
+
+function showMapLoading(message) {
+  var loadingEl = document.getElementById('map-loading');
+  if (!loadingEl) return;
+  loadingEl.style.display = 'flex';
+  loadingEl.innerHTML = '<div style="font-size:32px">🗺️</div>' + message;
+}
+
+function hideMapLoading() {
+  var loadingEl = document.getElementById('map-loading');
+  if (!loadingEl) return;
+  loadingEl.style.display = 'none';
+}
+
+function toggleMapSearchButton(show) {
+  var btn = document.getElementById('btn-map-search-here');
+  if (!btn) return;
+  btn.classList.toggle('hidden', !show);
+}
 
 function initMap() {
   if (mapInstance) return;
 
   mapInstance = L.map('map-container', {
-    center: [48.8566, 2.3522],
+    center: [USER_LOCATION.lat, USER_LOCATION.lng],
     zoom: 13,
     zoomControl: true
   });
@@ -18,10 +37,6 @@ function initMap() {
     maxZoom: 19
   }).addTo(mapInstance);
 
-  // Centre sur la position de l'utilisateur si dispo
-  if (USER_LOCATION) {
-    mapInstance.setView([USER_LOCATION.lat, USER_LOCATION.lng], 13);
-    // Marqueur "vous êtes ici" - pulsant et distinct
   var userIcon = L.divIcon({
     html: '<div style="position:relative;width:24px;height:24px">' +
       '<div style="position:absolute;inset:0;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(59,130,246,0.6)"></div>' +
@@ -31,10 +46,21 @@ function initMap() {
     iconSize: [24, 24],
     iconAnchor: [12, 12]
   });
-  L.marker([USER_LOCATION.lat, USER_LOCATION.lng], { icon: userIcon, zIndexOffset: 1000 })
-    .addTo(mapInstance)
-    .bindPopup('<b>Vous êtes ici</b>');
-  }
+
+  mapUserMarker = L.marker([USER_LOCATION.lat, USER_LOCATION.lng], {
+    icon: userIcon,
+    zIndexOffset: 1000
+  }).addTo(mapInstance).bindPopup('<b>Vous êtes ici</b>');
+
+  mapInstance.on('moveend', function() {
+    mapSearchInZonePending = true;
+    toggleMapSearchButton(true);
+  });
+
+  mapInstance.on('zoomend', function() {
+    mapSearchInZonePending = true;
+    toggleMapSearchButton(true);
+  });
 
   renderMapEvents();
 }
@@ -42,23 +68,26 @@ function initMap() {
 function renderMapEvents() {
   if (!mapInstance) return;
 
-  // Supprime les anciens markers
-  mapMarkers.forEach(function(m) { mapInstance.removeLayer(m); });
+  mapMarkers.forEach(function(m) {
+    mapInstance.removeLayer(m);
+  });
   mapMarkers = [];
 
-  // Utilise EVENTS directement (déjà chargés avec GPS)
+  var bounds = mapInstance.getBounds();
+
   var filtered = EVENTS.filter(function(e) {
     if (!e.lat || !e.lng) return false;
+
     if (mapSelectedDate) {
       if (!e.dateISO) return false;
       var evDate = new Date(e.dateISO).toDateString();
       var selDate = new Date(mapSelectedDate).toDateString();
       if (evDate !== selDate) return false;
     }
-    return true;
+
+    return bounds.contains([e.lat, e.lng]);
   });
 
-  // Icône personnalisée selon catégorie
   var catColors = {
     concert: '#ff3b5c',
     expo: '#a855f7',
@@ -69,6 +98,7 @@ function renderMapEvents() {
 
   filtered.forEach(function(ev) {
     var color = catColors[ev.category] || '#ff3b5c';
+
     var icon = L.divIcon({
       html: '<div style="background:' + color + ';width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.4)"></div>',
       className: '',
@@ -95,11 +125,8 @@ function renderMapEvents() {
     mapMarkers.push(marker);
   });
 
-  // Ajuste la vue pour montrer tous les markers
-  if (mapMarkers.length > 0 && !mapSelectedDate) {
-    var group = L.featureGroup(mapMarkers);
-    mapInstance.fitBounds(group.getBounds().pad(0.1));
-  }
+  mapSearchInZonePending = false;
+  toggleMapSearchButton(false);
 }
 
 window.openDetailFromMap = function(eventId) {
@@ -115,53 +142,69 @@ function openMapScreen() {
     n.classList.remove('active');
   });
 
-  var doInit = function() {
-    var loadingEl = document.getElementById('map-loading');
-    if (loadingEl) loadingEl.style.display = 'none';
-    initMap();
-    if (mapInstance) {
-      mapInstance.invalidateSize();
-      renderMapEvents();
-    }
-  };
+  showMapLoading('Autorise la localisation pour utiliser la carte');
 
-  var doGeoAndInit = function() {
-    if (USER_LOCATION) {
-      doInit();
-    } else {
-      requestUserLocation().then(function() {
-        EVENTS.forEach(function(e) {
-          if (e.lat && e.lng && USER_LOCATION) {
-            e.distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, e.lat, e.lng);
-            e.distance = formatDistance(e.distanceKm);
-          }
-        });
-        doInit();
-      });
-    }
-  };
-
-  // Charge TOUS les events puis affiche la carte
-  function loadAll() {
-    if (EVENTS_EXHAUSTED) {
-      setTimeout(doGeoAndInit, 100);
+  requestUserLocation().then(function(location) {
+    if (!location) {
+      showMapLoading('Autorise la localisation pour utiliser la carte');
       return;
     }
-    loadEvents().then(function() {
-      buildDeck();
-      if (!EVENTS_EXHAUSTED) {
-        loadAll();
-      } else {
-        doGeoAndInit();
+
+    EVENTS.forEach(function(e) {
+      if (e.lat && e.lng && USER_LOCATION) {
+        e.distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, e.lat, e.lng);
+        e.distance = formatDistance(e.distanceKm);
       }
     });
-  }
 
-  loadAll();
+    function finish() {
+      hideMapLoading();
+
+      if (!mapInstance) {
+        initMap();
+      } else {
+        mapInstance.setView([USER_LOCATION.lat, USER_LOCATION.lng], 13);
+        if (mapUserMarker) {
+          mapUserMarker.setLatLng([USER_LOCATION.lat, USER_LOCATION.lng]);
+        }
+        renderMapEvents();
+      }
+
+      setTimeout(function() {
+        if (mapInstance) mapInstance.invalidateSize();
+      }, 100);
+    }
+
+    function loadAll() {
+      if (EVENTS_EXHAUSTED) {
+        finish();
+        return;
+      }
+
+      loadEvents().then(function() {
+        buildDeck();
+        if (!EVENTS_EXHAUSTED) {
+          loadAll();
+        } else {
+          finish();
+        }
+      });
+    }
+
+    loadAll();
+  });
 }
 
-// Filtre par date
 function setMapDate(dateStr) {
   mapSelectedDate = dateStr || null;
   renderMapEvents();
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+  var btnSearchHere = document.getElementById('btn-map-search-here');
+  if (btnSearchHere) {
+    btnSearchHere.addEventListener('click', function() {
+      renderMapEvents();
+    });
+  }
+});
