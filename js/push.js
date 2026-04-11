@@ -20,7 +20,7 @@ function isPushSupported() {
 }
 
 function getPushToggleButton() {
-  return document.getElementById('btn-push-toggle');
+  return null;
 }
 
 function setGroupsNavActive() {
@@ -236,3 +236,22 @@ if ('serviceWorker' in navigator) {
     if (currentUser) handlePushNavigation(event.data.url);
   });
 }
+function requestPushOnAppStart() {
+  if (!currentUser || !isPushSupported()) return;
+
+  var alreadyAsked = false;
+  try {
+    alreadyAsked = localStorage.getItem('outnow_push_prompted') === '1';
+  } catch (e) {}
+
+  if (Notification.permission === 'granted') {
+    syncPushSubscription().catch(console.error);
+    return;
+  }
+
+  if (Notification.permission !== 'default' || alreadyAsked) return;
+
+  try { localStorage.setItem('outnow_push_prompted', '1'); } catch (e) {}
+  enablePushNotifications().catch(console.error);
+}
+window.requestPushOnAppStart = requestPushOnAppStart;
