@@ -398,7 +398,7 @@
     var memberIds = Array.from(checked).map(function(c) { return c.value; });
     document.getElementById('create-group-modal').classList.add('hidden');
     document.getElementById('new-group-name').value = '';
-    createGroup(name, memberIds);
+    createGroup(name, memberIds, city);
   });
 
   document.getElementById('btn-send-message').addEventListener('click', function() {
