@@ -245,3 +245,23 @@ window.addEventListener('load', function() {
     });
   }
 });
+var friendshipsSubscription = null;
+
+function subscribeToFriendRequests() {
+  if (!currentUser) return;
+  if (friendshipsSubscription) {
+    try { friendshipsSubscription.unsubscribe(); } catch (e) {}
+  }
+
+  friendshipsSubscription = sb.channel('friendships-' + currentUser.id)
+    .on('postgres_changes', {
+      event: '*',
+      schema: 'public',
+      table: 'friendships',
+      filter: 'receiver_id=eq.' + currentUser.id
+    }, function() {
+      loadPendingRequests();
+      loadFriends();
+    })
+    .subscribe();
+}
