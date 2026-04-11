@@ -38,7 +38,7 @@ function loadUserGroups() {
       }
       var groupIds = res.data.map(function(r) { return r.group_id; });
       sb.from('groups')
-        .select('id, name, created_by')
+        .select('id, name, city, created_by')
         .in('id', groupIds)
         .then(function(res2) {
           renderGroupList(res2.error ? [] : (res2.data || []));
@@ -90,7 +90,7 @@ function renderGroupList(groups) {
         notifications.groups[g.id].matches = false;
       }
       updateNotificationDots();
-      openGroup(g.id, g.name);
+      openGroup(g.id, g.name, g.city);
     });
 
     el.appendChild(item);
@@ -209,7 +209,7 @@ function leaveGroup(groupId) {
 // ── CRÉER UN GROUPE ──
 function createGroup(name, memberIds) {
   if (!currentUser || !name) return;
-  sb.from('groups').insert({ name: name, created_by: currentUser.id }).select().single()
+  sb.from('groups').insert({ name: name, city: city, created_by: currentUser.id }).select().single()
     .then(function(res) {
       if (res.error) throw res.error;
       var groupId = res.data.id;
@@ -226,8 +226,8 @@ function createGroup(name, memberIds) {
 }
 
 // ── OUVRIR UN GROUPE ──
-function openGroup(groupId, groupName) {
-  currentGroup = { id: groupId, name: groupName };
+function openGroup(groupId, groupName, groupCity) {
+  currentGroup = { id: groupId, name: groupName, city: groupCity };
   document.getElementById('group-detail-name').textContent = groupName;
   groupSwipes = {};
   groupMessages = [];
@@ -402,7 +402,9 @@ function renderGroupSwipeDeck() {
   var mySwipedIds = Object.keys(groupSwipes).filter(function(eid) {
     return (groupSwipes[eid] || []).find(function(s) { return s.user_id === currentUser.id; });
   });
-  var remaining = EVENTS.filter(function(e) { return mySwipedIds.indexOf(String(e.id)) === -1; });
+  var remaining = EVENTS.filter(function(e) {
+    return mySwipedIds.indexOf(String(e.id)) === -1 && e.cityKey === currentGroup.city;
+  });
   stack.innerHTML = '';
   if (remaining.length === 0) {
     stack.innerHTML = '<div class="card-empty"><div class="empty-emoji">✅</div><h3>Tout swipe !</h3></div>';
