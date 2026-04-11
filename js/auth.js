@@ -36,9 +36,10 @@ function startApp() {
   if (appStarted) return;
   appStarted = true;
 
-  // Vérifie si l'utilisateur a déjà choisi ses villes
   var hasCities = false;
-  try { hasCities = !!localStorage.getItem('outnow_cities'); } catch (e) {}
+  try {
+    hasCities = !!localStorage.getItem('outnow_cities');
+  } catch (e) {}
 
   if (!hasCities) {
     initCityScreen();
@@ -80,64 +81,21 @@ function startApp() {
     }
   }, 800);
 
-  // Polling notifs toutes les 30 secondes
-  setInterval(function() {
-    if (currentUser) loadPendingRequests();
-  }, 30000);
-
-  // Polling messages toutes les 10 secondes pour tous les groupes
-  var lastSeenMessages = {};
-  try {
-    lastSeenMessages = JSON.parse(localStorage.getItem('outnow_last_seen') || '{}');
-  } catch (e) {}
-
-  setInterval(function() {
-    if (!currentUser) return;
-
-    sb.from('group_members').select('group_id').eq('user_id', currentUser.id)
-      .then(function(res) {
-        if (res.error || !res.data) return;
-
-        res.data.forEach(function(row) {
-          var gid = row.group_id;
-
-          sb.from('group_messages').select('id, user_id, created_at')
-            .eq('group_id', gid)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .then(function(r) {
-              if (r.error || !r.data || r.data.length === 0) return;
-
-              var last = r.data[0];
-              if (last.user_id === currentUser.id) return;
-
-              var lastSeen = lastSeenMessages[gid] || '0';
-              if (last.created_at > lastSeen) {
-                var isInGroup = currentGroup && currentGroup.id === gid && groupTab === 'chat';
-
-                if (!isInGroup) {
-                  setGroupNotif(gid, 'chat', true);
-                } else {
-                  lastSeenMessages[gid] = last.created_at;
-                  try {
-                    localStorage.setItem('outnow_last_seen', JSON.stringify(lastSeenMessages));
-                  } catch (e) {}
-                }
-              }
-            });
-        });
-      });
-  }, 10000);
-
-  // Marque les messages comme vus quand on entre dans le chat
   window.markGroupChatSeen = function(groupId) {
-    sb.from('group_messages').select('created_at')
+    sb.from('group_messages')
+      .select('created_at')
       .eq('group_id', groupId)
       .order('created_at', { ascending: false })
       .limit(1)
       .then(function(r) {
         if (r.data && r.data.length > 0) {
+          var lastSeenMessages = {};
+          try {
+            lastSeenMessages = JSON.parse(localStorage.getItem('outnow_last_seen') || '{}');
+          } catch (e) {}
+
           lastSeenMessages[groupId] = r.data[0].created_at;
+
           try {
             localStorage.setItem('outnow_last_seen', JSON.stringify(lastSeenMessages));
           } catch (e) {}
