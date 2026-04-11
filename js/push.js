@@ -163,10 +163,35 @@ function handlePushNavigation(rawUrl) {
   var groupId = url.searchParams.get('groupId');
   var tab = url.searchParams.get('tab') || 'chat';
 
+  if (screen === 'friends') {
+    showScreen('friends');
+    document.querySelectorAll('.nav-item').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.screen === 'friends');
+    });
+    notifications.newFriendRequest = false;
+    updateNotificationDots();
+    loadFriends();
+    loadPendingRequests();
+    history.replaceState({}, document.title, window.location.pathname);
+    return;
+  }
+
+  if (screen === 'groups' && !groupId) {
+    showScreen('groups');
+    document.querySelectorAll('.nav-item').forEach(function(btn) {
+      btn.classList.toggle('active', btn.dataset.screen === 'groups');
+    });
+    notifications.newGroup = false;
+    updateNotificationDots();
+    loadUserGroups();
+    history.replaceState({}, document.title, window.location.pathname);
+    return;
+  }
+
   if (screen !== 'groups' || !groupId) return;
 
   sb.from('groups')
-    .select('id, name')
+    .select('id, name, city')
     .eq('id', groupId)
     .single()
     .then(function(res) {
@@ -181,9 +206,12 @@ function handlePushNavigation(rawUrl) {
         notifications.groups[groupId].matches = false;
       }
       updateNotificationDots();
-      setGroupsNavActive();
 
-      openGroup(res.data.id, res.data.name);
+      document.querySelectorAll('.nav-item').forEach(function(btn) {
+        btn.classList.toggle('active', btn.dataset.screen === 'groups');
+      });
+
+      openGroup(res.data.id, res.data.name, res.data.city);
 
       if (tab === 'matches') switchGroupTab('matches');
       else if (tab === 'swipe') switchGroupTab('swipe');
