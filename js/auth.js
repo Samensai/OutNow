@@ -38,43 +38,45 @@ function startApp() {
 
   // Vérifie si l'utilisateur a déjà choisi ses villes
   var hasCities = false;
-  try { hasCities = !!localStorage.getItem('outnow_cities'); } catch(e) {}
+  try { hasCities = !!localStorage.getItem('outnow_cities'); } catch (e) {}
 
   if (!hasCities) {
-    // Premier lancement : montre l'écran de sélection de ville
     initCityScreen();
     showScreen('cities');
   } else {
     showScreen('home');
-    loadEvents().then(function() { buildDeck(); renderCards(); });
+    loadEvents().then(function() {
+      buildDeck();
+      renderCards();
+    });
   }
 
   updateProfileUI();
 
-  if (typeof updatePushButtonUI === 'function') {
-    updatePushButtonUI();
-  }
-
-  if (
-    typeof syncPushSubscription === 'function' &&
-    'Notification' in window &&
-    Notification.permission === 'granted'
-  ) {
-    syncPushSubscription()
-      .then(function() {
-        if (typeof updatePushButtonUI === 'function') updatePushButtonUI();
-      })
-      .catch(function(err) {
-        console.error('syncPushSubscription error:', err);
-      });
-  }
-
-  // Vérifie les notifs après que la nav soit visible
   setTimeout(function() {
     loadPendingRequests();
     loadUserGroups();
+
     if (typeof tryHandleCurrentUrlPushRoute === 'function') {
       tryHandleCurrentUrlPushRoute();
+    }
+
+    if (
+      typeof enablePushNotifications === 'function' &&
+      'Notification' in window &&
+      Notification.permission === 'default'
+    ) {
+      enablePushNotifications().catch(function(err) {
+        console.error('enablePushNotifications error:', err);
+      });
+    } else if (
+      typeof syncPushSubscription === 'function' &&
+      'Notification' in window &&
+      Notification.permission === 'granted'
+    ) {
+      syncPushSubscription().catch(function(err) {
+        console.error('syncPushSubscription error:', err);
+      });
     }
   }, 800);
 
@@ -85,32 +87,41 @@ function startApp() {
 
   // Polling messages toutes les 10 secondes pour tous les groupes
   var lastSeenMessages = {};
-  try { lastSeenMessages = JSON.parse(localStorage.getItem('outnow_last_seen') || '{}'); } catch(e) {}
+  try {
+    lastSeenMessages = JSON.parse(localStorage.getItem('outnow_last_seen') || '{}');
+  } catch (e) {}
 
   setInterval(function() {
     if (!currentUser) return;
+
     sb.from('group_members').select('group_id').eq('user_id', currentUser.id)
       .then(function(res) {
         if (res.error || !res.data) return;
+
         res.data.forEach(function(row) {
           var gid = row.group_id;
+
           sb.from('group_messages').select('id, user_id, created_at')
             .eq('group_id', gid)
             .order('created_at', { ascending: false })
             .limit(1)
             .then(function(r) {
               if (r.error || !r.data || r.data.length === 0) return;
+
               var last = r.data[0];
               if (last.user_id === currentUser.id) return;
+
               var lastSeen = lastSeenMessages[gid] || '0';
               if (last.created_at > lastSeen) {
                 var isInGroup = currentGroup && currentGroup.id === gid && groupTab === 'chat';
+
                 if (!isInGroup) {
                   setGroupNotif(gid, 'chat', true);
                 } else {
-                  // On est dans le chat, marque comme vu
                   lastSeenMessages[gid] = last.created_at;
-                  try { localStorage.setItem('outnow_last_seen', JSON.stringify(lastSeenMessages)); } catch(e) {}
+                  try {
+                    localStorage.setItem('outnow_last_seen', JSON.stringify(lastSeenMessages));
+                  } catch (e) {}
                 }
               }
             });
@@ -127,7 +138,9 @@ function startApp() {
       .then(function(r) {
         if (r.data && r.data.length > 0) {
           lastSeenMessages[groupId] = r.data[0].created_at;
-          try { localStorage.setItem('outnow_last_seen', JSON.stringify(lastSeenMessages)); } catch(e) {}
+          try {
+            localStorage.setItem('outnow_last_seen', JSON.stringify(lastSeenMessages));
+          } catch (e) {}
         }
       });
   };
