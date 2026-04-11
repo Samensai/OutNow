@@ -1,13 +1,11 @@
 var EVENTS = [];
 var EVENTS_LOADING = false;
 var EVENTS_EXHAUSTED = false;
-var SEEN_IDS = {};
 var USER_LOCATION = null;
 
 var OPENAGENDA_KEY = "6cf33cc591df40a9b0fac2a946d4c3ec";
 var TODAY = new Date().toISOString().split('T')[0];
 
-// ── VILLES ET AGENDAS ──
 var CITIES = {
   paris:    { label: 'Paris',    agendas: [61665301, 52870970, 85121895, 14898606, 20272888, 39308038, 95716291] },
   bordeaux: { label: 'Bordeaux', agendas: [1108324, 83392987] },
@@ -16,53 +14,96 @@ var CITIES = {
   rennes:   { label: 'Rennes',   agendas: [20500020] }
 };
 
-// Villes sélectionnées par l'utilisateur (chargées depuis localStorage)
 var SELECTED_CITIES = [];
-try {
-  var saved = localStorage.getItem('outnow_cities');
-  SELECTED_CITIES = saved ? JSON.parse(saved) : ['paris'];
-} catch(e) { SELECTED_CITIES = ['paris']; }
-if (!SELECTED_CITIES.length) SELECTED_CITIES = ['paris'];
-
-// Construction de la liste des agendas actifs (sans doublons)
 var AGENDAS = [];
+var LOADED_EVENT_IDS = {};
+var SEEN_IDS = {};
+
+try {
+  var savedCities = localStorage.getItem('outnow_cities');
+  SELECTED_CITIES = savedCities ? JSON.parse(savedCities) : ['paris'];
+} catch (e) {
+  SELECTED_CITIES = ['paris'];
+}
+if (!SELECTED_CITIES || !SELECTED_CITIES.length) SELECTED_CITIES = ['paris'];
+
+try {
+  var savedSeenIds = localStorage.getItem('outnow_seen_event_ids');
+  SEEN_IDS = savedSeenIds ? JSON.parse(savedSeenIds) : {};
+} catch (e) {
+  SEEN_IDS = {};
+}
+
+function saveSeenIds() {
+  try {
+    localStorage.setItem('outnow_seen_event_ids', JSON.stringify(SEEN_IDS));
+  } catch (e) {}
+}
+
+function markEventSeen(eventId) {
+  if (!eventId) return;
+  SEEN_IDS[String(eventId)] = true;
+  saveSeenIds();
+}
+
+function isEventSeen(eventId) {
+  return !!SEEN_IDS[String(eventId)];
+}
 
 function buildAgendaList() {
-  var seen = {};
+  var seenAgendaIds = {};
   AGENDAS = [];
+
   SELECTED_CITIES.forEach(function(city) {
     if (!CITIES[city]) return;
     CITIES[city].agendas.forEach(function(uid) {
-      if (!seen[uid]) {
-        seen[uid] = true;
-        AGENDAS.push({ uid: uid, cursor: null, done: false });
-      }
+      if (seenAgendaIds[uid]) return;
+      seenAgendaIds[uid] = true;
+      AGENDAS.push({ uid: uid, cursor: null, done: false });
     });
   });
 }
 
-function saveSelectedCities(cities) {
-  SELECTED_CITIES = cities;
-  try { localStorage.setItem('outnow_cities', JSON.stringify(cities)); } catch(e) {}
-  // Reset et recharge
+function resetLoadedEvents() {
   EVENTS = [];
-  SEEN_IDS = {};
+  LOADED_EVENT_IDS = {};
   EVENTS_LOADING = false;
   EVENTS_EXHAUSTED = false;
   buildAgendaList();
 }
 
-// ── GÉOLOCALISATION ──
+function saveSelectedCities(cities) {
+  SELECTED_CITIES = Array.isArray(cities) && cities.length ? cities : ['paris'];
+  try {
+    localStorage.setItem('outnow_cities', JSON.stringify(SELECTED_CITIES));
+  } catch (e) {}
+
+  resetLoadedEvents();
+}
+
 function requestUserLocation() {
   return new Promise(function(resolve) {
-    if (!navigator.geolocation) { resolve(null); return; }
+    if (!navigator.geolocation) {
+      resolve(null);
+      return;
+    }
+
     navigator.geolocation.getCurrentPosition(
       function(pos) {
-        USER_LOCATION = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        USER_LOCATION = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude
+        };
         resolve(USER_LOCATION);
       },
-      function() { resolve(null); },
-      { timeout: 8000, maximumAge: 300000 }
+      function() {
+        resolve(null);
+      },
+      {
+        timeout: 8000,
+        maximumAge: 300000,
+        enableHighAccuracy: true
+      }
     );
   });
 }
@@ -71,10 +112,10 @@ function getDistanceKm(lat1, lng1, lat2, lng2) {
   var R = 6371;
   var dLat = (lat2 - lat1) * Math.PI / 180;
   var dLng = (lng2 - lng1) * Math.PI / 180;
-  var a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+  var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLng/2) * Math.sin(dLng/2);
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 function formatDistance(km) {
@@ -82,53 +123,128 @@ function formatDistance(km) {
   return km.toFixed(1) + ' km';
 }
 
-// ── DÉTECTION DU PRIX ──
 function detectPrice(e) {
   var text = '';
   if (e.title && e.title.fr) text += e.title.fr + ' ';
   if (e.description && e.description.fr) text += e.description.fr + ' ';
   if (e.conditions && e.conditions.fr) text += e.conditions.fr + ' ';
   text = text.toLowerCase();
+
   if (text.match(/gratuit|entr.e libre|entr.e gratuite|free|sans frais|acc.s libre/)) {
     return { price: 0, priceLabel: 'Gratuit' };
   }
+
   var euroMatch = text.match(/(\d+(?:[.,]\d+)?)\s*€/);
   if (euroMatch) {
     var amount = parseFloat(euroMatch[1].replace(',', '.'));
     return { price: amount, priceLabel: amount + ' €' };
   }
+
   if (e.registration && e.registration.length > 0) {
     var reg = e.registration[0];
     if (reg.type === 'free') return { price: 0, priceLabel: 'Gratuit' };
     if (reg.value) return { price: parseFloat(reg.value) || 5, priceLabel: reg.value + ' €' };
     return { price: 5, priceLabel: 'Payant' };
   }
+
   return { price: 0, priceLabel: 'Voir détails' };
 }
 
-// ── CHARGEMENT ──
+function toEventCard(e, indexOffset) {
+  var title = (e.title && (e.title.fr || e.title.en)) || 'Evenement';
+  var desc = (e.description && (e.description.fr || e.description.en)) || '';
+  var loc = (e.location && (e.location.name || e.location.city)) || '';
+  var city = (e.location && e.location.city) || '';
+  var lat = (e.location && e.location.latitude) || null;
+  var lng = (e.location && e.location.longitude) || null;
+
+  var image = fallbackImage(indexOffset);
+  if (e.image && e.image.base && e.image.filename) {
+    image = e.image.base + e.image.filename;
+  }
+
+  var priceInfo = detectPrice(e);
+  var dateStr = 'Prochainement';
+  var dateISO = null;
+  var timing = e.firstTiming || e.nextTiming || e.lastTiming;
+
+  if (timing && timing.begin) {
+    dateISO = timing.begin;
+    var d = new Date(timing.begin);
+    dateStr = d.toLocaleDateString('fr-FR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }
+
+  var keywords = [];
+  if (e.keywords && e.keywords.fr) {
+    keywords = Array.isArray(e.keywords.fr) ? e.keywords.fr : [e.keywords.fr];
+  }
+
+  var cat = detectCategory(keywords, title, desc);
+  var tags = keywords.slice(0, 3);
+  if (tags.length === 0) tags = [cat];
+
+  var distanceKm = null;
+  var distanceLabel = city || 'France';
+  if (USER_LOCATION && lat && lng) {
+    distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, lat, lng);
+    distanceLabel = formatDistance(distanceKm);
+  }
+
+  return {
+    id: e.uid || (Date.now() + indexOffset),
+    title: title,
+    category: cat,
+    tags: tags,
+    date: dateStr,
+    dateISO: dateISO,
+    location: loc + (city && loc.indexOf(city) === -1 ? ', ' + city : ''),
+    lat: lat,
+    lng: lng,
+    city: city,
+    distance: distanceLabel,
+    distanceKm: distanceKm,
+    price: priceInfo.price,
+    priceLabel: priceInfo.priceLabel,
+    image: image,
+    description: desc,
+    liked: false
+  };
+}
+
 function loadEvents() {
   if (EVENTS_LOADING || EVENTS_EXHAUSTED) return Promise.resolve();
   if (AGENDAS.length === 0) buildAgendaList();
+
   EVENTS_LOADING = true;
 
   var now = new Date();
-  var activeAgendas = AGENDAS.filter(function(a) { return !a.done; });
+  var activeAgendas = AGENDAS.filter(function(a) {
+    return !a.done;
+  });
+
   if (activeAgendas.length === 0) {
     EVENTS_EXHAUSTED = true;
     EVENTS_LOADING = false;
     return Promise.resolve();
   }
 
-  var promises = activeAgendas.map(function(agenda) {
+  var requests = activeAgendas.map(function(agenda) {
     var url = 'https://api.openagenda.com/v2/agendas/' + agenda.uid + '/events'
       + '?key=' + OPENAGENDA_KEY
       + '&size=20&lang=fr&timings[gte]=' + TODAY;
+
     if (agenda.cursor) {
       agenda.cursor.forEach(function(val) {
         url += '&after[]=' + encodeURIComponent(val);
       });
     }
+
     return fetch(url, { headers: { 'Accept': 'application/json' } })
       .then(function(res) { return res.json(); })
       .then(function(data) {
@@ -136,87 +252,57 @@ function loadEvents() {
         else agenda.done = true;
         return data.events || [];
       })
-      .catch(function() { agenda.done = true; return []; });
+      .catch(function() {
+        agenda.done = true;
+        return [];
+      });
   });
 
-  return Promise.all(promises).then(function(results) {
-    var all = [];
-    results.forEach(function(evts) { all = all.concat(evts); });
+  return Promise.all(requests)
+    .then(function(results) {
+      var all = [];
+      results.forEach(function(items) {
+        all = all.concat(items);
+      });
 
-    var newEvents = all.filter(function(e) {
-      // Déduplication globale par uid
-      if (SEEN_IDS[e.uid]) return false;
-      var timing = e.firstTiming || e.nextTiming || e.lastTiming;
-      if (timing && timing.begin && new Date(timing.begin) < now) return false;
-      SEEN_IDS[e.uid] = true;
-      return true;
-    }).map(function(e, i) {
-      var title = (e.title && (e.title.fr || e.title.en)) || 'Evenement';
-      var desc = (e.description && (e.description.fr || e.description.en)) || '';
-      var loc = (e.location && (e.location.name || e.location.city)) || '';
-      var city = (e.location && e.location.city) || '';
-      var lat = (e.location && e.location.latitude) || null;
-      var lng = (e.location && e.location.longitude) || null;
+      var newEvents = all
+        .filter(function(e) {
+          var eventId = String(e.uid || '');
+          if (!eventId) return false;
+          if (LOADED_EVENT_IDS[eventId]) return false;
+          if (isEventSeen(eventId)) return false;
 
-      var image = fallbackImage(Object.keys(SEEN_IDS).length + i);
-      if (e.image && e.image.base && e.image.filename) {
-        image = e.image.base + e.image.filename;
-      }
+          var timing = e.firstTiming || e.nextTiming || e.lastTiming;
+          if (timing && timing.begin && new Date(timing.begin) < now) return false;
 
-      var priceInfo = detectPrice(e);
+          LOADED_EVENT_IDS[eventId] = true;
+          return true;
+        })
+        .map(function(e, i) {
+          return toEventCard(e, EVENTS.length + i);
+        });
 
-      var dateStr = 'Prochainement';
-      var dateISO = null;
-      var timing = e.firstTiming || e.nextTiming || e.lastTiming;
-      if (timing && timing.begin) {
-        dateISO = timing.begin;
-        var d = new Date(timing.begin);
-        dateStr = d.toLocaleDateString('fr-FR', {
-          weekday: 'long', day: 'numeric', month: 'long',
-          hour: '2-digit', minute: '2-digit'
+      if (USER_LOCATION) {
+        newEvents.sort(function(a, b) {
+          var da = a.distanceKm !== null && a.distanceKm !== undefined ? a.distanceKm : 999999;
+          var db = b.distanceKm !== null && b.distanceKm !== undefined ? b.distanceKm : 999999;
+          return da - db;
+        });
+      } else {
+        newEvents.sort(function(a, b) {
+          if (!a.dateISO || !b.dateISO) return 0;
+          return new Date(a.dateISO) - new Date(b.dateISO);
         });
       }
 
-      var keywords = [];
-      if (e.keywords && e.keywords.fr) {
-        keywords = Array.isArray(e.keywords.fr) ? e.keywords.fr : [e.keywords.fr];
-      }
-      var cat = detectCategory(keywords, title, desc);
-      var tags = keywords.slice(0, 3);
-      if (tags.length === 0) tags = [cat];
-
-      var distanceKm = null;
-      var distanceLabel = city || 'France';
-      if (USER_LOCATION && lat && lng) {
-        distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, lat, lng);
-        distanceLabel = formatDistance(distanceKm);
-      }
-
-      return {
-        id: e.uid || (Date.now() + i),
-        title: title,
-        category: cat,
-        tags: tags,
-        date: dateStr,
-        dateISO: dateISO,
-        location: loc + (city && loc.indexOf(city) === -1 ? ', ' + city : ''),
-        lat: lat,
-        lng: lng,
-        distance: distanceLabel,
-        distanceKm: distanceKm,
-        price: priceInfo.price,
-        priceLabel: priceInfo.priceLabel,
-        image: image,
-        description: desc,
-        liked: false
-      };
+      EVENTS = EVENTS.concat(newEvents);
+      if (AGENDAS.every(function(a) { return a.done; })) EVENTS_EXHAUSTED = true;
+      EVENTS_LOADING = false;
+    })
+    .catch(function(err) {
+      console.error('loadEvents error:', err);
+      EVENTS_LOADING = false;
     });
-
-    EVENTS = EVENTS.concat(newEvents);
-    if (AGENDAS.every(function(a) { return a.done; })) EVENTS_EXHAUSTED = true;
-    EVENTS_LOADING = false;
-    console.log('OutNow: ' + EVENTS.length + ' evenements charges (' + SELECTED_CITIES.join(', ') + ')');
-  });
 }
 
 function detectCategory(keywords, title, desc) {
@@ -242,5 +328,4 @@ function fallbackImage(i) {
   return imgs[i % imgs.length];
 }
 
-// Init
 buildAgendaList();
