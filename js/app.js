@@ -345,14 +345,6 @@ if ($('btn-dislike')) {
   });
 }
 
-if ($('btn-super')) {
-  $('btn-super').style.display = 'none';
-  $('btn-super').addEventListener('click', function(e) {
-    e.preventDefault();
-    e.stopPropagation();
-  });
-}
-
 document.querySelectorAll('.cat-pill').forEach(function(pill) {
   pill.addEventListener('click', function() {
     document.querySelectorAll('.cat-pill').forEach(function(item) {
