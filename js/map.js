@@ -1,7 +1,8 @@
+// js/map.js — Carte Leaflet OutNow
+
 var mapInstance = null;
 var mapMarkers = [];
 var mapSelectedDate = null;
-var mapSearchInZonePending = false;
 var mapUserMarker = null;
 
 function showMapLoading(message) {
@@ -21,6 +22,36 @@ function toggleMapSearchButton(show) {
   var btn = document.getElementById('btn-map-search-here');
   if (!btn) return;
   btn.classList.toggle('hidden', !show);
+}
+
+function getMapEventDateKey(ev) {
+  if (!ev) return null;
+  if (ev.dateISO && typeof ev.dateISO === 'string') {
+    return ev.dateISO.slice(0, 10);
+  }
+  return null;
+}
+
+function getMapSourceEvents() {
+  var merged = [];
+  var seen = {};
+
+  (EVENTS || []).forEach(function(ev) {
+    if (!ev || !ev.id) return;
+    seen[String(ev.id)] = true;
+    merged.push(ev);
+  });
+
+  if (state && Array.isArray(state.liked)) {
+    state.liked.forEach(function(ev) {
+      if (!ev || !ev.id) return;
+      if (seen[String(ev.id)]) return;
+      seen[String(ev.id)] = true;
+      merged.push(ev);
+    });
+  }
+
+  return merged;
 }
 
 function initMap() {
@@ -53,12 +84,10 @@ function initMap() {
   }).addTo(mapInstance).bindPopup('<b>Vous êtes ici</b>');
 
   mapInstance.on('moveend', function() {
-    mapSearchInZonePending = true;
     toggleMapSearchButton(true);
   });
 
   mapInstance.on('zoomend', function() {
-    mapSearchInZonePending = true;
     toggleMapSearchButton(true);
   });
 
@@ -74,15 +103,14 @@ function renderMapEvents() {
   mapMarkers = [];
 
   var bounds = mapInstance.getBounds();
+  var sourceEvents = getMapSourceEvents();
 
-  var filtered = EVENTS.filter(function(e) {
-    if (!e.lat || !e.lng) return false;
+  var filtered = sourceEvents.filter(function(e) {
+    if (!e || !e.lat || !e.lng) return false;
 
     if (mapSelectedDate) {
-      if (!e.dateISO) return false;
-      var evDate = new Date(e.dateISO).toDateString();
-      var selDate = new Date(mapSelectedDate).toDateString();
-      if (evDate !== selDate) return false;
+      var eventDateKey = getMapEventDateKey(e);
+      if (!eventDateKey || eventDateKey !== mapSelectedDate) return false;
     }
 
     return bounds.contains([e.lat, e.lng]);
@@ -125,12 +153,12 @@ function renderMapEvents() {
     mapMarkers.push(marker);
   });
 
-  mapSearchInZonePending = false;
   toggleMapSearchButton(false);
 }
 
 window.openDetailFromMap = function(eventId) {
-  var ev = EVENTS.find(function(e) { return e.id === eventId; });
+  var sourceEvents = getMapSourceEvents();
+  var ev = sourceEvents.find(function(e) { return String(e.id) === String(eventId); });
   if (!ev) return;
   previousScreen = 'map';
   openDetail(ev);
@@ -150,14 +178,7 @@ function openMapScreen() {
       return;
     }
 
-    EVENTS.forEach(function(e) {
-      if (e.lat && e.lng && USER_LOCATION) {
-        e.distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, e.lat, e.lng);
-        e.distance = formatDistance(e.distanceKm);
-      }
-    });
-
-    function finish() {
+    function finishMapOpen() {
       hideMapLoading();
 
       if (!mapInstance) {
@@ -177,16 +198,24 @@ function openMapScreen() {
 
     function loadAll() {
       if (EVENTS_EXHAUSTED) {
-        finish();
+        finishMapOpen();
         return;
       }
 
       loadEvents().then(function() {
         buildDeck();
+
+        EVENTS.forEach(function(e) {
+          if (e.lat && e.lng && USER_LOCATION) {
+            e.distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, e.lat, e.lng);
+            e.distance = formatDistance(e.distanceKm);
+          }
+        });
+
         if (!EVENTS_EXHAUSTED) {
           loadAll();
         } else {
-          finish();
+          finishMapOpen();
         }
       });
     }
