@@ -271,13 +271,37 @@ function loadGroupMessages(groupId) {
 
 function sendMessage(content) {
   if (!content || !content.trim() || !currentGroup || !currentUser) return;
-  sb.from('group_messages').insert({
-    group_id: currentGroup.id,
-    user_id: currentUser.id,
-    content: content.trim()
-  }).then(function(res) {
-    if (res.error) console.error('sendMessage:', res.error);
-  });
+
+  var text = content.trim();
+
+  sb.from('group_messages')
+    .insert({
+      group_id: currentGroup.id,
+      user_id: currentUser.id,
+      content: text
+    })
+    .select('id, group_id, user_id, content, created_at')
+    .single()
+    .then(function(res) {
+      if (res.error) {
+        console.error('sendMessage:', res.error);
+        return;
+      }
+
+      var exists = groupMessages.some(function(m) {
+        return String(m.id) === String(res.data.id);
+      });
+
+      if (!exists) {
+        var msg = res.data;
+        msg.profiles = { username: currentProfile ? currentProfile.username : '?' };
+        groupMessages.push(msg);
+
+        if (groupTab === 'chat') {
+          renderMessages();
+        }
+      }
+    });
 }
 
 function renderMessages() {
