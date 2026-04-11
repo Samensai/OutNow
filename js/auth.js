@@ -56,20 +56,19 @@ function startApp() {
 
   setTimeout(function() {
     loadPendingRequests();
+    loadFriends();
     loadUserGroups();
+
+    if (typeof subscribeToFriendRequests === 'function') {
+      subscribeToFriendRequests();
+    }
 
     if (typeof tryHandleCurrentUrlPushRoute === 'function') {
       tryHandleCurrentUrlPushRoute();
     }
 
-    if (
-      typeof enablePushNotifications === 'function' &&
-      'Notification' in window &&
-      Notification.permission === 'default'
-    ) {
-      enablePushNotifications().catch(function(err) {
-        console.error('enablePushNotifications error:', err);
-      });
+    if (typeof requestPushOnAppStart === 'function') {
+      requestPushOnAppStart();
     } else if (
       typeof syncPushSubscription === 'function' &&
       'Notification' in window &&
