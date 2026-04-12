@@ -6,7 +6,7 @@ var USER_LOCATION = null;
 var OPENAGENDA_KEY = "6cf33cc591df40a9b0fac2a946d4c3ec";
 var TODAY = new Date().toISOString().split('T')[0];
 
-var DATATOURISME_FLOW_URL = 'https://diffuseur.datatourisme.fr/webservice/72deab4d06c1679dc3f61a7ccb20323f/2d73b7dc-8d60-4941-a941-e34455c12f05';
+var DATATOURISME_FLOW_URL = 'https://ivpgtkvyjnwkivcegmej.supabase.co/functions/v1/datatourisme-proxy';
 var DATATOURISME_LOADING = false;
 var DATATOURISME_LOADED = false;
 
@@ -388,8 +388,9 @@ function toDatatourismeCard(poi, indexOffset) {
   var lng = findFirstNumberForKeys(poi, ['longitude']);
   if (lat === null || lng === null) return null;
 
-  var image = findFirstImageUrl(poi) || fallbackImage(indexOffset);
-
+  var image = findFirstImageUrl(poi);
+  if (!image) return null;
+  
   var typeText = JSON.stringify(poi).toLowerCase();
   var keywords = [];
   if (typeText.indexOf('museum') !== -1 || typeText.indexOf('musée') !== -1 || typeText.indexOf('musee') !== -1) {
