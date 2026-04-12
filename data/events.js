@@ -439,7 +439,9 @@ function toDatatourismeCard(poi, indexOffset) {
     isPermanent: true
   };
 }
-
+function shouldLoadDatatourisme() {
+  return SELECTED_CITIES.indexOf('paris') !== -1;
+}
 function loadDatatourismePlaces() {
   if (!shouldLoadDatatourisme()) return Promise.resolve([]);
   if (DATATOURISME_LOADED || DATATOURISME_LOADING) return Promise.resolve([]);
@@ -448,67 +450,6 @@ function loadDatatourismePlaces() {
 
   return fetch(DATATOURISME_FLOW_URL)
     .then(function(res) { return res.json(); })
-    .then(function(items) {
-      var cards = (items || [])
-        .filter(Boolean)
-        .map(function(item, i) {
-          return toDatatourismeCard(item, i);
-        })
-        .filter(Boolean)
-        .filter(function(card) {
-          var id = String(card.id || '');
-          if (!id) return false;
-          if (LOADED_EVENT_IDS[id]) return false;
-          if (isEventSeen(id)) return false;
-          LOADED_EVENT_IDS[id] = true;
-          return true;
-        });
-
-      DATATOURISME_LOADED = true;
-      DATATOURISME_LOADING = false;
-      return cards;
-    })
-    .catch(function(err) {
-      console.error('loadDatatourismePlaces error:', err);
-      DATATOURISME_LOADING = false;
-      return [];
-    });
-}
-function loadDatatourismePlaces() {
-  if (!shouldLoadDatatourisme()) return Promise.resolve([]);
-  if (DATATOURISME_LOADED || DATATOURISME_LOADING) return Promise.resolve([]);
-  if (typeof JSZip === 'undefined') {
-    console.error('JSZip n\'est pas chargé');
-    return Promise.resolve([]);
-  }
-
-  DATATOURISME_LOADING = true;
-
-  return fetch(DATATOURISME_FLOW_URL)
-    .then(function(res) { return res.arrayBuffer(); })
-    .then(function(buffer) { return JSZip.loadAsync(buffer); })
-    .then(function(zip) {
-      var jsonFiles = [];
-
-      zip.forEach(function(relativePath, file) {
-        var lower = relativePath.toLowerCase();
-        if (file.dir) return;
-        if (lower.indexOf('.json') === -1) return;
-        if (lower.indexOf('index') !== -1) return;
-        if (lower.indexOf('context') !== -1) return;
-        jsonFiles.push(file);
-      });
-
-      return Promise.all(jsonFiles.map(function(file) {
-        return file.async('string').then(function(text) {
-          try {
-            return JSON.parse(text);
-          } catch (e) {
-            return null;
-          }
-        });
-      }));
-    })
     .then(function(items) {
       var cards = (items || [])
         .filter(Boolean)
