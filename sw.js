@@ -1,4 +1,4 @@
-const CACHE = 'outnow-v5';
+const CACHE = 'outnow-v6';
 const ASSETS = [
   './',
   './index.html',
