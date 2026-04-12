@@ -440,10 +440,40 @@ function toDatatourismeCard(poi, indexOffset) {
   };
 }
 
-function shouldLoadDatatourisme() {
-  return SELECTED_CITIES.indexOf('paris') !== -1;
-}
+function loadDatatourismePlaces() {
+  if (!shouldLoadDatatourisme()) return Promise.resolve([]);
+  if (DATATOURISME_LOADED || DATATOURISME_LOADING) return Promise.resolve([]);
 
+  DATATOURISME_LOADING = true;
+
+  return fetch(DATATOURISME_FLOW_URL)
+    .then(function(res) { return res.json(); })
+    .then(function(items) {
+      var cards = (items || [])
+        .filter(Boolean)
+        .map(function(item, i) {
+          return toDatatourismeCard(item, i);
+        })
+        .filter(Boolean)
+        .filter(function(card) {
+          var id = String(card.id || '');
+          if (!id) return false;
+          if (LOADED_EVENT_IDS[id]) return false;
+          if (isEventSeen(id)) return false;
+          LOADED_EVENT_IDS[id] = true;
+          return true;
+        });
+
+      DATATOURISME_LOADED = true;
+      DATATOURISME_LOADING = false;
+      return cards;
+    })
+    .catch(function(err) {
+      console.error('loadDatatourismePlaces error:', err);
+      DATATOURISME_LOADING = false;
+      return [];
+    });
+}
 function loadDatatourismePlaces() {
   if (!shouldLoadDatatourisme()) return Promise.resolve([]);
   if (DATATOURISME_LOADED || DATATOURISME_LOADING) return Promise.resolve([]);
