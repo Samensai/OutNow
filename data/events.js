@@ -339,15 +339,26 @@ function findFirstNumberForKeys(obj, keyParts) {
 function findFirstImageUrl(obj) {
   var found = recursiveFindFirst(obj, function(value, keyName) {
     if (typeof value !== 'string') return false;
-    var lower = value.toLowerCase();
-    if (lower.indexOf('http') !== 0) return false;
-    if (lower.match(/\.(jpg|jpeg|png|webp)(\?|$)/)) return true;
+
+    var lowerValue = value.toLowerCase();
+    if (lowerValue.indexOf('http') !== 0) return false;
+
     var key = String(keyName || '').toLowerCase();
-    return key.indexOf('image') !== -1 || key.indexOf('thumbnail') !== -1 || key.indexOf('photo') !== -1;
+
+    if (lowerValue.match(/\.(jpg|jpeg|png|webp)(\?|$)/)) return true;
+
+    return (
+      key.indexOf('image') !== -1 ||
+      key.indexOf('thumbnail') !== -1 ||
+      key.indexOf('photo') !== -1 ||
+      key.indexOf('locator') !== -1 ||
+      key.indexOf('contenturl') !== -1 ||
+      key === 'url'
+    );
   });
+
   return typeof found === 'string' ? found : '';
 }
-
 function detectCityKeyFromDatatourisme(cityName) {
   var city = String(cityName || '').toLowerCase();
   if (!city) return 'paris';
@@ -360,6 +371,7 @@ function detectCityKeyFromDatatourisme(cityName) {
 
 function toDatatourismeCard(poi, indexOffset) {
   var title =
+    normalizeLangValue(poi['ebucore:title']) ||
     normalizeLangValue(poi['dc:title']) ||
     normalizeLangValue(poi['rdfs:label']) ||
     normalizeLangValue(poi['schema:name']) ||
@@ -369,10 +381,11 @@ function toDatatourismeCard(poi, indexOffset) {
   if (!title) return null;
 
   var desc =
+    normalizeLangValue(poi['ebucore:comments']) ||
     normalizeLangValue(poi['dc:description']) ||
     normalizeLangValue(poi['owl:comment']) ||
     normalizeLangValue(poi.description) ||
-    findFirstStringForKeys(poi, ['description', 'comment']);
+    findFirstStringForKeys(poi, ['description', 'comment', 'abstract']);
 
   var city =
     normalizeLangValue(poi['schema:addressLocality']) ||
@@ -390,9 +403,10 @@ function toDatatourismeCard(poi, indexOffset) {
 
   var image = findFirstImageUrl(poi);
   if (!image) return null;
-  
+
   var typeText = JSON.stringify(poi).toLowerCase();
   var keywords = [];
+
   if (typeText.indexOf('museum') !== -1 || typeText.indexOf('musée') !== -1 || typeText.indexOf('musee') !== -1) {
     keywords.push('musée');
   }
@@ -407,12 +421,17 @@ function toDatatourismeCard(poi, indexOffset) {
   var cat = detectCategory(keywords, title, desc || '');
   var distanceKm = null;
   var distanceLabel = city || 'Île-de-France';
+
   if (USER_LOCATION) {
     distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, lat, lng);
     distanceLabel = formatDistance(distanceKm);
   }
 
-  var dtId = normalizeLangValue(poi['@id']) || normalizeLangValue(poi.id) || ('poi-' + indexOffset);
+  var dtId =
+    normalizeLangValue(poi['@id']) ||
+    normalizeLangValue(poi.id) ||
+    ('poi-' + indexOffset);
+
   var cityKey = detectCityKeyFromDatatourisme(city);
 
   return {
@@ -438,6 +457,31 @@ function toDatatourismeCard(poi, indexOffset) {
     kind: 'place',
     isPermanent: true
   };
+}
+function extractDatatourismePoi(doc) {
+  if (!doc || typeof doc !== 'object') return null;
+
+  var graph = Array.isArray(doc['@graph']) ? doc['@graph'] : [doc];
+
+  var candidates = graph.filter(function(node) {
+    return node && typeof node === 'object';
+  });
+
+  var typed = candidates.find(function(node) {
+    var types = node['@type'];
+    var text = JSON.stringify(types || '').toLowerCase();
+
+    return (
+      text.indexOf('pointofinterest') !== -1 ||
+      text.indexOf('placeofinterest') !== -1 ||
+      text.indexOf('culturalsite') !== -1 ||
+      text.indexOf('museum') !== -1 ||
+      text.indexOf('touristattraction') !== -1 ||
+      text.indexOf('heritagesite') !== -1
+    );
+  });
+
+  return typed || candidates[0] || null;
 }
 function shouldLoadDatatourisme() {
   return SELECTED_CITIES.indexOf('paris') !== -1;
@@ -481,8 +525,12 @@ function loadDatatourismePlaces() {
     .then(function(items) {
       var cards = (items || [])
         .filter(Boolean)
-        .map(function(item, i) {
-          return toDatatourismeCard(item, i);
+        .map(function(item) {
+          return extractDatatourismePoi(item);
+        })
+        .filter(Boolean)
+        .map(function(poi, i) {
+          return toDatatourismeCard(poi, i);
         })
         .filter(Boolean)
         .filter(function(card) {
@@ -496,6 +544,7 @@ function loadDatatourismePlaces() {
 
       DATATOURISME_LOADED = true;
       DATATOURISME_LOADING = false;
+      console.log('DATATOURISME cards =', cards.length);
       return cards;
     })
     .catch(function(err) {
