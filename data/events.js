@@ -446,10 +446,38 @@ function loadDatatourismePlaces() {
   if (!shouldLoadDatatourisme()) return Promise.resolve([]);
   if (DATATOURISME_LOADED || DATATOURISME_LOADING) return Promise.resolve([]);
 
+  if (typeof JSZip === 'undefined') {
+    console.error('JSZip n\'est pas chargé');
+    return Promise.resolve([]);
+  }
+
   DATATOURISME_LOADING = true;
 
   return fetch(DATATOURISME_FLOW_URL)
-    .then(function(res) { return res.json(); })
+    .then(function(res) { return res.arrayBuffer(); })
+    .then(function(buffer) { return JSZip.loadAsync(buffer); })
+    .then(function(zip) {
+      var jsonFiles = [];
+
+      zip.forEach(function(relativePath, file) {
+        var lower = relativePath.toLowerCase();
+        if (file.dir) return;
+        if (!lower.endsWith('.json')) return;
+        if (lower.indexOf('index') !== -1) return;
+        if (lower.indexOf('context') !== -1) return;
+        jsonFiles.push(file);
+      });
+
+      return Promise.all(jsonFiles.map(function(file) {
+        return file.async('string').then(function(text) {
+          try {
+            return JSON.parse(text);
+          } catch (e) {
+            return null;
+          }
+        });
+      }));
+    })
     .then(function(items) {
       var cards = (items || [])
         .filter(Boolean)
