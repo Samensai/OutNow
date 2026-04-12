@@ -1,4 +1,4 @@
-const CACHE = 'outnow-v4';
+const CACHE = 'outnow-v5';
 const ASSETS = [
   './',
   './index.html',
@@ -39,13 +39,17 @@ self.addEventListener('activate', function(e) {
 });
 
 self.addEventListener('fetch', function(e) {
+  if (!/^https?:/i.test(e.request.url)) {
+    return;
+  }
+
   if (e.request.url.match(/\.(js|css)(\?|$)/)) {
     e.respondWith(
       fetch(e.request)
         .then(function(response) {
           var clone = response.clone();
           caches.open(CACHE).then(function(cache) {
-            cache.put(e.request, clone);
+            cache.put(e.request, clone).catch(function() {});
           });
           return response;
         })
