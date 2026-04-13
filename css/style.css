@@ -35,17 +35,87 @@ html, body {
   background: var(--bg);
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
-  gap: 12px;
-  animation: splashOut 0.5s ease 1.8s forwards;
+  gap: 8px;
+  animation: splashOut 0.5s ease 3.2s forwards;
 }
 #splash .splash-logo {
   font-family: var(--font-display);
   font-size: 64px; letter-spacing: 2px;
   background: linear-gradient(135deg, var(--accent), var(--accent2));
   -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  margin-bottom: 4px;
 }
-#splash .splash-sub { color: var(--text2); font-size: 14px; font-weight: 300; }
 @keyframes splashOut { to { opacity: 0; pointer-events: none; } }
+
+/* ── OUTNOW LOADER ANIMATION ── */
+.outnow-loader { display: grid; place-items: center; }
+
+.outnow-loader .route {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 7 10;
+}
+
+.outnow-loader .reveal {
+  fill: none;
+  stroke-width: 11;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+}
+
+.outnow-loader .pin,
+.outnow-loader .pin-hole {
+  fill: none;
+  stroke: #ff3b5c;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+}
+
+.outnow-loader .pin-wrap {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center bottom;
+}
+
+.outnow-loader.animate .reveal-left {
+  animation: loaderDrawLeft 2400ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.outnow-loader.animate .reveal-diagonal {
+  animation: loaderDrawDiag 2400ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.outnow-loader.animate .reveal-right {
+  animation: loaderDrawRight 2400ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.outnow-loader.animate .pin-wrap {
+  animation: loaderPinPop 2400ms cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+.outnow-loader.animate .pin {
+  animation: loaderDrawPin 2400ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+.outnow-loader.animate .pin-hole {
+  animation: loaderDrawHole 2400ms cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+@keyframes loaderDrawLeft     { 0%,6%  { stroke-dashoffset:100 } 24%,100% { stroke-dashoffset:0 } }
+@keyframes loaderDrawDiag     { 0%,20% { stroke-dashoffset:100 } 44%,100% { stroke-dashoffset:0 } }
+@keyframes loaderDrawRight    { 0%,34% { stroke-dashoffset:100 } 60%,100% { stroke-dashoffset:0 } }
+@keyframes loaderDrawPin      { 0%,58% { stroke-dashoffset:100 } 76%,100% { stroke-dashoffset:0 } }
+@keyframes loaderDrawHole     { 0%,72% { stroke-dashoffset:100 } 84%,100% { stroke-dashoffset:0 } }
+@keyframes loaderPinPop {
+  0%,56%  { opacity:0; transform:translateY(8px) scale(0.76) }
+  68%     { opacity:1; transform:translateY(2px) scale(0.92) }
+  76%     { opacity:1; transform:translateY(-2px) scale(1.1) }
+  84%     { opacity:1; transform:translateY(0) scale(0.97) }
+  92%,100%{ opacity:1; transform:translateY(0) scale(1) }
+}
 
 /* ── APP SHELL ── */
 #app {
