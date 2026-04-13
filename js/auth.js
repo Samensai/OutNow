@@ -48,6 +48,7 @@ function startApp() {
     loadPendingRequests();
     loadFriends();
     loadUserGroups();
+    if (typeof loadDoneEvents === 'function') loadDoneEvents();
 
     if (typeof subscribeToFriendRequests === 'function') {
       subscribeToFriendRequests();
@@ -106,13 +107,17 @@ function updateProfileUI() {
 function openProfileModal() {
   if (!currentProfile) return;
 
-  // Remplir les infos statiques
   var username = currentProfile.username || '—';
   var email = currentProfile.email || (currentUser && currentUser.email) || '—';
+  var score = currentProfile.score || 0;
+  var grade = typeof getGrade === 'function' ? getGrade(score) : { emoji: '🌱', label: 'Curieux' };
 
   document.getElementById('profile-modal-username').textContent = username;
   document.getElementById('profile-modal-email').textContent = email;
   document.getElementById('profile-avatar-letter').textContent = username.charAt(0).toUpperCase();
+
+  var gradeEl = document.getElementById('profile-modal-grade');
+  if (gradeEl) gradeEl.textContent = grade.emoji + ' ' + grade.label;
 
   // Compter les amis
   document.getElementById('profile-modal-friends').textContent = '…';
