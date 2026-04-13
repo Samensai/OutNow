@@ -31,15 +31,42 @@ function hideAuthScreen() {
   document.getElementById('bottom-nav-wrap').classList.remove('hidden');
 }
 
+var LOADER_CYCLE = 2400; // ms — doit correspondre à la durée CSS
+
+// Masque un loader :
+// - si le chargement a duré >= 1 cycle : masque immédiatement
+// - sinon : attend la fin du premier cycle
+function hideLoaderAfterCycle(el, startTime) {
+  if (!el) return;
+  var elapsed = Date.now() - startTime;
+  var delay = elapsed >= LOADER_CYCLE ? 0 : (LOADER_CYCLE - elapsed);
+  setTimeout(function() {
+    el.style.transition = 'opacity 0.4s ease';
+    el.style.opacity = '0';
+    setTimeout(function() {
+      el.style.display = 'none';
+      el.style.opacity = '1';
+      el.style.transition = '';
+    }, 400);
+  }, delay);
+}
+
 var appStarted = false;
 function startApp() {
   if (appStarted) return;
   appStarted = true;
 
   showScreen('home');
+
+  // Afficher le loader home
+  var homeLoader = document.getElementById('home-loading');
+  if (homeLoader) { homeLoader.style.display = 'flex'; homeLoader.style.opacity = '1'; }
+  var loadStart = Date.now();
+
   loadEvents().then(function() {
     buildDeck();
     renderCards();
+    hideLoaderAfterCycle(homeLoader, loadStart);
   });
 
   updateProfileUI();
