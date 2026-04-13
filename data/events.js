@@ -25,13 +25,15 @@ var WIKIDATA_LOADING = false;
 
 // Requête SPARQL : musées, galeries, monuments à Paris avec image, coordonnées et article Wikipedia FR
 var WIKIDATA_SPARQL = '\
-SELECT DISTINCT ?item ?name ?desc ?image ?lat ?lng ?type ?article WHERE {\
+SELECT DISTINCT ?item ?name ?desc ?image ?lat ?lng ?type ?article ?website ?hours WHERE {\
   ?item wdt:P131* wd:Q90 .\
   ?item wdt:P625 ?coords .\
   ?item wdt:P18 ?image .\
   ?item rdfs:label ?name . FILTER(LANG(?name) = "fr")\
   OPTIONAL { ?item schema:description ?desc . FILTER(LANG(?desc) = "fr") }\
   OPTIONAL { ?article schema:about ?item ; schema:inLanguage "fr" ; schema:isPartOf <https://fr.wikipedia.org/> . }\
+  OPTIONAL { ?item wdt:P856 ?website . }\
+  OPTIONAL { ?item wdt:P6886 ?hours . }\
   { ?item wdt:P31/wdt:P279* wd:Q33506 . BIND("musee" AS ?type) }\
   UNION\
   { ?item wdt:P31/wdt:P279* wd:Q207694 . BIND("musee" AS ?type) }\
@@ -41,11 +43,17 @@ SELECT DISTINCT ?item ?name ?desc ?image ?lat ?lng ?type ?article WHERE {\
   { ?item wdt:P31/wdt:P279* wd:Q23413 . BIND("monument" AS ?type) }\
   UNION\
   { ?item wdt:P31/wdt:P279* wd:Q839954 . BIND("monument" AS ?type) }\
+  UNION\
+  { ?item wdt:P31/wdt:P279* wd:Q22698 . BIND("parc" AS ?type) }\
+  UNION\
+  { ?item wdt:P31/wdt:P279* wd:Q1107656 . BIND("parc" AS ?type) }\
+  UNION\
+  { ?item wdt:P31/wdt:P279* wd:Q24354 . BIND("spectacle" AS ?type) }\
   ?item wdt:P625 ?coordsVal .\
   BIND(geof:latitude(?coordsVal) AS ?lat)\
   BIND(geof:longitude(?coordsVal) AS ?lng)\
   FILTER(?lat > 48.8 && ?lat < 48.92 && ?lng > 2.25 && ?lng < 2.42)\
-} LIMIT 120';
+} LIMIT 150';
 
 try {
   var savedSeenIds = localStorage.getItem('outnow_seen_event_ids');
@@ -156,6 +164,7 @@ function detectCategory(keywords, title, desc) {
   if (text.match(/expo|exposition|art|musee|musée|galerie|photo|peinture|patrimoine|monument|visite/)) return 'expo';
   if (text.match(/sport|foot|basket|tennis|volley|course|yoga|danse/)) return 'sport';
   if (text.match(/food|gastronomie|marche|marché|cuisine|restaurant|degustation|dégustation/)) return 'food';
+  if (text.match(/parc|jardin|garden|park|nature|verdure/)) return 'parc';
   return 'soiree';
 }
 
@@ -221,14 +230,28 @@ function toWikidataCard(row, index) {
   var type = row.type && row.type.value ? row.type.value : 'musee';
   var itemId = row.item && row.item.value ? row.item.value.split('/').pop() : ('wd-' + index);
   var articleUrl = row.article && row.article.value ? row.article.value : null;
+  var website = row.website && row.website.value ? row.website.value : null;
+  var hours = row.hours && row.hours.value ? row.hours.value : null;
 
   var id = 'wd:' + itemId;
   if (LOADED_EVENT_IDS[id]) return null;
   if (isEventSeen(id)) return null;
   LOADED_EVENT_IDS[id] = true;
 
-  var keywords = [type === 'galerie' ? 'galerie' : type === 'monument' ? 'monument' : 'musée'];
+  // Mots-clés et catégorie selon le type
+  var typeKeywords = {
+    'musee':    'musée',
+    'galerie':  'galerie',
+    'monument': 'monument',
+    'parc':     'parc',
+    'spectacle':'spectacle'
+  };
+  var keywords = [typeKeywords[type] || 'culture'];
   var cat = detectCategory(keywords, name, desc);
+
+  // Prix non renseigné — on n'affiche rien
+  var price = 0;
+  var priceLabel = null;
 
   var distanceKm = null;
   var distanceLabel = 'Paris';
@@ -251,10 +274,12 @@ function toWikidataCard(row, index) {
     cityKey: 'paris',
     distance: distanceLabel,
     distanceKm: distanceKm,
-    price: 0,
-    priceLabel: 'Voir détails',
+    price: price,
+    priceLabel: priceLabel,
+    website: website,
+    hours: hours,
     image: image,
-    description: desc,           // fallback Wikidata, remplacé ensuite si Wikipedia disponible
+    description: desc,
     wikipediaTitle: wikipediaTitleFromUrl(articleUrl),
     liked: false,
     source: 'wikidata',
