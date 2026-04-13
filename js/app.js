@@ -10,7 +10,7 @@ var state = {
   events: [],
   deck: [],
   disliked: [],
-  currentFilter: { cat: 'all', distance: 999, budget: 999 },
+  currentFilter: { cat: 'all', distance: 999 },
   liked: savedLikesInit,
   currentDetail: null
 };
@@ -100,7 +100,6 @@ function eventAlreadyDisliked(eventId) {
 
 function buildDeck() {
   var cat = state.currentFilter.cat;
-  var budget = state.currentFilter.budget;
   var maxDist = state.currentFilter.distance;
   var deckIds = state.deck.map(function(e) { return e.id; });
 
@@ -110,8 +109,6 @@ function buildDeck() {
     var notInDeck = deckIds.indexOf(e.id) === -1;
     var notSeen = typeof isEventSeen === 'function' ? !isEventSeen(e.id) : true;
     var matchCat = cat === 'all' || e.category === cat;
-    var matchBudget = e.price <= budget;
-
     var matchDist = true;
     if (
       typeof USER_LOCATION !== 'undefined' &&
@@ -123,7 +120,7 @@ function buildDeck() {
       matchDist = e.distanceKm <= maxDist;
     }
 
-    return notLiked && notDisliked && notInDeck && notSeen && matchCat && matchBudget && matchDist;
+    return notLiked && notDisliked && notInDeck && notSeen && matchCat && matchDist;
   });
 
   if (typeof USER_LOCATION !== 'undefined' && USER_LOCATION) {
@@ -392,18 +389,7 @@ if ($('filter-distance')) {
   });
 }
 
-document.querySelectorAll('.budget-pill').forEach(function(pill) {
-  pill.addEventListener('click', function() {
-    pill.closest('.budget-pills').querySelectorAll('.budget-pill').forEach(function(item) {
-      item.classList.remove('active');
-    });
 
-    pill.classList.add('active');
-    if (pill.dataset.val !== undefined) {
-      state.currentFilter.budget = parseInt(pill.dataset.val, 10);
-    }
-  });
-});
 
 function openDetail(ev) {
   state.currentDetail = ev;
@@ -433,11 +419,13 @@ function openDetail(ev) {
         ev.location + (ev.distance !== 'Paris' ? ' · ' + ev.distance : '') +
       '</div>' +
       '<div class="detail-desc">' + ev.description + '</div>' +
-      (ev.priceLabel && ev.priceLabel !== 'Voir détails' ? '<div class="detail-price-badge">' + ev.priceLabel + '</div>' : '') +
+      (ev.hours ? '<div class="detail-meta-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' + ev.hours + '</div>' : '') +
+
       '<div class="detail-cta">' +
         '<button class="btn-primary" onclick="likeFromDetail(\'' + ev.id + '\')">' +
           (isLiked ? '❤️ Sauvegardé' : '🤍 Sauvegarder') +
         '</button>' +
+        (ev.website ? '<a class="btn-website" href="' + ev.website + '" target="_blank" rel="noopener">🌐 Site officiel</a>' : '') +
         '<button class="btn-done' + (isDone ? ' is-done' : '') + '" id="btn-mark-done" onclick="handleMarkDone(\'' + ev.id + '\')">' +
           (isDone ? '✅ Fait !' : '☑️ Marquer comme fait') +
         '</button>' +
