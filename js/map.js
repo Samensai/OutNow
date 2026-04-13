@@ -158,10 +158,24 @@ function openMapScreen() {
   });
 
   showMapLoading('Chargement de la carte...');
+  var mapLoadStart = Date.now();
 
   requestUserLocation().then(function() {
     function finishMapOpen() {
-      hideMapLoading();
+      var mapLoader = document.getElementById('map-loading');
+      var elapsed = Date.now() - mapLoadStart;
+      var delay = elapsed >= 2400 ? 0 : (2400 - elapsed);
+      setTimeout(function() {
+        if (mapLoader) {
+          mapLoader.style.transition = 'opacity 0.4s ease';
+          mapLoader.style.opacity = '0';
+          setTimeout(function() {
+            mapLoader.style.display = 'none';
+            mapLoader.style.opacity = '1';
+            mapLoader.style.transition = '';
+          }, 400);
+        }
+      }, delay);
 
       if (!mapInstance) {
         initMap();
