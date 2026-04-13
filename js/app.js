@@ -434,7 +434,7 @@ function openDetail(ev) {
       '<div class="detail-desc">' + ev.description + '</div>' +
       '<div class="detail-price-badge">' + ev.priceLabel + '</div>' +
       '<div class="detail-cta">' +
-        '<button class="btn-primary" onclick="likeFromDetail(' + ev.id + ')">' +
+        '<button class="btn-primary" onclick="likeFromDetail(\'' + ev.id + '\')">' +
           (isLiked ? '❤️ Sauvegardé' : '🤍 Sauvegarder') +
         '</button>' +
       '</div>' +
@@ -444,8 +444,8 @@ function openDetail(ev) {
 }
 
 window.likeFromDetail = function(id) {
-  var ev = EVENTS.find(function(item) { return item.id === id; }) ||
-           state.liked.find(function(item) { return item.id === id; });
+  var ev = EVENTS.find(function(item) { return String(item.id) === String(id); }) ||
+           state.liked.find(function(item) { return String(item.id) === String(id); });
 
   if (!ev) return;
 
@@ -484,7 +484,7 @@ function renderLikes() {
     var isPast = ev.dateISO && new Date(ev.dateISO) < now;
 
     return '' +
-      '<div class="like-item" onclick="openLikeDetail(' + ev.id + ')">' +
+      '<div class="like-item" onclick="openLikeDetail(\'' + ev.id + '\')">' +
         '<img src="' + ev.image + '" alt="' + ev.title + '" loading="lazy" />' +
         (isPast ? '<div class="like-past-badge">Passé</div>' : '') +
         '<div class="like-item-info">' +
@@ -496,8 +496,8 @@ function renderLikes() {
 }
 
 window.openLikeDetail = function(id) {
-  var ev = EVENTS.find(function(item) { return item.id === id; }) ||
-           state.liked.find(function(item) { return item.id === id; });
+  var ev = EVENTS.find(function(item) { return String(item.id) === String(id); }) ||
+           state.liked.find(function(item) { return String(item.id) === String(id); });
 
   if (!ev) return;
 
