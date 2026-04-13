@@ -130,15 +130,51 @@ document.getElementById('btn-login').addEventListener('click', function() {
   btn.textContent = 'Connexion...';
   btn.disabled = true;
 
-  sb.auth.signInWithPassword({ email: identifier, password: password })
-    .then(function(res) {
-      if (res.error) throw res.error;
-    })
-    .catch(function(err) {
-      showAuthError(errEl, err.message || 'Erreur de connexion.');
-      btn.textContent = 'Se connecter';
-      btn.disabled = false;
-    });
+  // Détecte si l'identifiant est un email (contient @) ou un pseudo
+  var isEmail = identifier.indexOf('@') !== -1;
+
+  function doSignIn(email) {
+    sb.auth.signInWithPassword({ email: email, password: password })
+      .then(function(res) {
+        if (res.error) throw res.error;
+      })
+      .catch(function(err) {
+        showAuthError(errEl, 'Identifiant ou mot de passe incorrect.');
+        btn.textContent = 'Se connecter';
+        btn.disabled = false;
+      });
+  }
+
+  if (isEmail) {
+    doSignIn(identifier);
+  } else {
+    // Chercher l'email correspondant au pseudo dans profiles
+    sb.from('profiles')
+      .select('id')
+      .eq('username', identifier)
+      .single()
+      .then(function(res) {
+        if (res.error || !res.data) throw new Error('Pseudo introuvable.');
+        // Récupérer l'email via la fonction RPC ou auth admin — 
+        // Supabase ne permet pas de récupérer l'email depuis profiles directement.
+        // On stocke l'email dans profiles à l'inscription, on le lit ici.
+        return sb.from('profiles')
+          .select('email')
+          .eq('username', identifier)
+          .single();
+      })
+      .then(function(res) {
+        if (res.error || !res.data || !res.data.email) {
+          throw new Error('Email introuvable pour ce pseudo.');
+        }
+        doSignIn(res.data.email);
+      })
+      .catch(function(err) {
+        showAuthError(errEl, err.message || 'Pseudo introuvable.');
+        btn.textContent = 'Se connecter';
+        btn.disabled = false;
+      });
+  }
 });
 
 // ── REGISTER ──
@@ -163,6 +199,15 @@ document.getElementById('btn-register').addEventListener('click', function() {
       return sb.auth.signUp({
         email: email, password: password,
         options: { data: { username: username } }
+      }).then(function(signUpRes) {
+        if (signUpRes.error) throw signUpRes.error;
+        // Stocker l'email dans profiles pour permettre la connexion par pseudo
+        if (signUpRes.data && signUpRes.data.user) {
+          sb.from('profiles')
+            .upsert({ id: signUpRes.data.user.id, username: username, email: email })
+            .then(function() {});
+        }
+        return signUpRes;
       });
     })
     .then(function(res) {
