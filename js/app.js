@@ -413,6 +413,7 @@ function openDetail(ev) {
   }
 
   var isLiked = eventAlreadyLiked(ev.id);
+  var isDone  = typeof isEventDone === 'function' && isEventDone(ev.id);
 
   detailContent.innerHTML =
     '<img class="detail-hero" src="' + ev.image + '" alt="' + ev.title + '" />' +
@@ -437,11 +438,31 @@ function openDetail(ev) {
         '<button class="btn-primary" onclick="likeFromDetail(\'' + ev.id + '\')">' +
           (isLiked ? '❤️ Sauvegardé' : '🤍 Sauvegarder') +
         '</button>' +
+        '<button class="btn-done' + (isDone ? ' is-done' : '') + '" id="btn-mark-done" onclick="handleMarkDone(\'' + ev.id + '\')">' +
+          (isDone ? '✅ Fait !' : '☑️ Marquer comme fait') +
+        '</button>' +
       '</div>' +
+      '<button class="btn-leave-review" onclick="openReviewModal(\'' + ev.id + '\')">⭐ Laisser un avis</button>' +
+      '<div id="detail-reviews-section" style="margin-top:16px"></div>' +
     '</div>';
 
   showScreen('detail');
+
+  // Charger les avis
+  if (typeof renderReviewSection === 'function') {
+    renderReviewSection(ev.id);
+  }
 }
+
+window.handleMarkDone = function(eventId) {
+  if (typeof markEventDone !== 'function') return;
+  markEventDone(eventId).then(function() {
+    var btn = document.getElementById('btn-mark-done');
+    if (btn) { btn.textContent = '✅ Fait !'; btn.classList.add('is-done'); }
+    // Rafraîchir les likes pour afficher le badge
+    renderLikes();
+  });
+};
 
 window.likeFromDetail = function(id) {
   var ev = EVENTS.find(function(item) { return String(item.id) === String(id); }) ||
@@ -482,11 +503,13 @@ function renderLikes() {
 
   likesGrid.innerHTML = savedLikes.map(function(ev) {
     var isPast = ev.dateISO && new Date(ev.dateISO) < now;
+    var isDone = typeof isEventDone === 'function' && isEventDone(ev.id);
 
     return '' +
       '<div class="like-item" onclick="openLikeDetail(\'' + ev.id + '\')">' +
         '<img src="' + ev.image + '" alt="' + ev.title + '" loading="lazy" />' +
         (isPast ? '<div class="like-past-badge">Passé</div>' : '') +
+        (isDone ? '<div class="like-done-badge">Fait ✅</div>' : '') +
         '<div class="like-item-info">' +
           '<div class="like-item-title">' + ev.title + '</div>' +
           '<div class="like-item-date">' + ev.date + '</div>' +
