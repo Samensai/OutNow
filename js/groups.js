@@ -258,7 +258,7 @@ function openGroup(groupId, groupName, groupCity) {
 // ── CHAT ──
 function loadGroupMessages(groupId) {
   sb.from('group_messages')
-    .select('*, profiles(username)')
+    .select('*, profiles(username, score)')
     .eq('group_id', groupId)
     .order('created_at', { ascending: true })
     .limit(100)
@@ -314,8 +314,9 @@ function renderMessages() {
   el.innerHTML = groupMessages.map(function(m) {
     var isMe = m.user_id === currentUser.id;
     var author = m.profiles ? m.profiles.username : '?';
+    var authorGrade = (typeof getGrade === 'function' && m.profiles) ? getGrade(m.profiles.score || 0).emoji + ' ' : '';
     return '<div class="message ' + (isMe ? 'message-me' : 'message-them') + '">' +
-      (!isMe ? '<div class="message-author">' + author + '</div>' : '') +
+      (!isMe ? '<div class="message-author">' + authorGrade + author + '</div>' : '') +
       '<div class="message-bubble">' + m.content + '</div>' +
     '</div>';
   }).join('');
@@ -344,12 +345,12 @@ function subscribeToGroup(groupId) {
     }, function(payload) {
       if (payload.new.user_id !== currentUser.id) {
         sb.from('profiles')
-          .select('username')
+          .select('username, score')
           .eq('id', payload.new.user_id)
           .single()
           .then(function(profileRes) {
             var msg = payload.new;
-            msg.profiles = profileRes.data || { username: '?' };
+            msg.profiles = profileRes.data || { username: '?', score: 0 };
             groupMessages.push(msg);
 
             if (groupTab === 'chat') {
