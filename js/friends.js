@@ -35,14 +35,26 @@ function loadPendingRequests() {
     });
 }
 
+// Normalise une chaîne : minuscules + suppression des accents
+function normalizeStr(str) {
+  return String(str || '').toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 function searchUsers(query) {
-  if (!query || query.length < 2) return Promise.resolve([]);
+  if (!query || query.length < 3) return Promise.resolve([]);
+  // On récupère un ensemble large et on filtre côté client pour ignorer accents et casse
+  var normalized = normalizeStr(query);
   return sb.from('profiles')
     .select('id, username')
     .ilike('username', '%' + query + '%')
     .neq('id', currentUser.id)
-    .limit(10)
-    .then(function(res) { return res.data || []; });
+    .limit(30)
+    .then(function(res) {
+      return (res.data || []).filter(function(u) {
+        return normalizeStr(u.username).indexOf(normalized) !== -1;
+      }).slice(0, 10);
+    });
 }
 
 function sendFriendRequest(receiverId) {
@@ -245,7 +257,8 @@ window.addEventListener('load', function() {
   if (input) {
     input.addEventListener('input', function() {
       var q = this.value.trim();
-      if (q.length < 2) { document.getElementById('search-results').innerHTML = ''; return; }
+      var resultsEl = document.getElementById('search-results');
+      if (q.length < 3) { resultsEl.innerHTML = ''; return; }
       searchUsers(q).then(renderSearchResults);
     });
   }
