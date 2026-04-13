@@ -129,7 +129,7 @@ function renderMapEvents() {
         '<div style="font-size:11px;color:#888;margin-bottom:8px">' + ev.location + '</div>' +
         '<div style="display:flex;justify-content:space-between;align-items:center">' +
           '<span style="font-weight:700;color:#ff3b5c">' + ev.priceLabel + '</span>' +
-          '<button onclick="openDetailFromMap(' + ev.id + ')" style="background:#ff3b5c;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:12px;cursor:pointer">Voir</button>' +
+          '<button onclick="openDetailFromMap(\'' + ev.id + '\')" style="background:#ff3b5c;color:#fff;border:none;padding:5px 10px;border-radius:8px;font-size:12px;cursor:pointer">Voir</button>' +
         '</div>' +
         '</div>',
         { maxWidth: 220 }
