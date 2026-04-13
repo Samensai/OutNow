@@ -6,30 +6,19 @@ var USER_LOCATION = null;
 var OPENAGENDA_KEY = "6cf33cc591df40a9b0fac2a946d4c3ec";
 var TODAY = new Date().toISOString().split('T')[0];
 
-var DATATOURISME_FLOW_URL = 'https://ivpgtkvyjnwkivcegmej.supabase.co/functions/v1/datatourisme-proxy';
-var DATATOURISME_LOADING = false;
-var DATATOURISME_LOADED = false;
-
 var CITIES = {
-  paris:    { label: 'Paris',    agendas: [61665301, 52870970, 85121895, 14898606, 20272888, 39308038, 95716291] },
-  bordeaux: { label: 'Bordeaux', agendas: [1108324, 83392987] },
-  lille:    { label: 'Lille',    agendas: [57621068] },
-  nantes:   { label: 'Nantes',   agendas: [82470621] },
-  rennes:   { label: 'Rennes',   agendas: [20500020] }
+  paris:    { label: 'Paris',    agendas: [61665301, 52870970, 85121895, 14898606, 20272888, 39308038, 95716291] }
+  // bordeaux: { label: 'Bordeaux', agendas: [1108324, 83392987] },
+  // lille:    { label: 'Lille',    agendas: [57621068] },
+  // nantes:   { label: 'Nantes',   agendas: [82470621] },
+  // rennes:   { label: 'Rennes',   agendas: [20500020] }
 };
 
-var SELECTED_CITIES = [];
+var SELECTED_CITIES = ['paris'];
 var AGENDAS = [];
 var LOADED_EVENT_IDS = {};
 var SEEN_IDS = {};
 
-try {
-  var savedCities = localStorage.getItem('outnow_cities');
-  SELECTED_CITIES = savedCities ? JSON.parse(savedCities) : ['paris'];
-} catch (e) {
-  SELECTED_CITIES = ['paris'];
-}
-if (!SELECTED_CITIES || !SELECTED_CITIES.length) SELECTED_CITIES = ['paris'];
 
 try {
   var savedSeenIds = localStorage.getItem('outnow_seen_event_ids');
@@ -73,18 +62,7 @@ function resetLoadedEvents() {
   LOADED_EVENT_IDS = {};
   EVENTS_LOADING = false;
   EVENTS_EXHAUSTED = false;
-  DATATOURISME_LOADED = false;
-  DATATOURISME_LOADING = false;
   buildAgendaList();
-}
-
-function saveSelectedCities(cities) {
-  SELECTED_CITIES = Array.isArray(cities) && cities.length ? cities : ['paris'];
-  try {
-    localStorage.setItem('outnow_cities', JSON.stringify(SELECTED_CITIES));
-  } catch (e) {}
-
-  resetLoadedEvents();
 }
 
 function requestUserLocation() {
@@ -250,310 +228,6 @@ function toEventCard(e, indexOffset, cityKey) {
   };
 }
 
-function normalizeLangValue(value) {
-  if (!value) return '';
-  if (typeof value === 'string') return value;
-  if (Array.isArray(value)) {
-    for (var i = 0; i < value.length; i++) {
-      var v = normalizeLangValue(value[i]);
-      if (v) return v;
-    }
-    return '';
-  }
-  if (typeof value === 'object') {
-    if (typeof value.fr === 'string') return value.fr;
-    if (typeof value['@value'] === 'string') return value['@value'];
-    if (typeof value.value === 'string') return value.value;
-    if (typeof value.en === 'string') return value.en;
-    for (var key in value) {
-      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-      var nested = normalizeLangValue(value[key]);
-      if (nested) return nested;
-    }
-  }
-  return '';
-}
-
-function recursiveFindFirst(obj, predicate) {
-  var visited = [];
-
-  function walk(value, keyName) {
-    if (!value) return null;
-    if (typeof value !== 'object') {
-      return predicate(value, keyName) ? value : null;
-    }
-    if (visited.indexOf(value) !== -1) return null;
-    visited.push(value);
-
-    if (Array.isArray(value)) {
-      for (var i = 0; i < value.length; i++) {
-        var arrResult = walk(value[i], keyName);
-        if (arrResult !== null && arrResult !== undefined && arrResult !== '') return arrResult;
-      }
-      return null;
-    }
-
-    for (var key in value) {
-      if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
-      var result = walk(value[key], key);
-      if (result !== null && result !== undefined && result !== '') return result;
-    }
-
-    return null;
-  }
-
-  return walk(obj, '');
-}
-
-function findFirstStringForKeys(obj, keyParts) {
-  var lowerParts = keyParts.map(function(p) { return String(p).toLowerCase(); });
-  var found = recursiveFindFirst(obj, function(value, keyName) {
-    if (typeof value !== 'string') return false;
-    var key = String(keyName || '').toLowerCase();
-    if (!key) return false;
-    return lowerParts.some(function(part) {
-      return key.indexOf(part) !== -1;
-    });
-  });
-  return typeof found === 'string' ? found.trim() : '';
-}
-
-function findFirstNumberForKeys(obj, keyParts) {
-  var lowerParts = keyParts.map(function(p) { return String(p).toLowerCase(); });
-  var found = recursiveFindFirst(obj, function(value, keyName) {
-    var key = String(keyName || '').toLowerCase();
-    if (!key) return false;
-    var keyMatch = lowerParts.some(function(part) {
-      return key.indexOf(part) !== -1;
-    });
-    if (!keyMatch) return false;
-    if (typeof value === 'number') return true;
-    if (typeof value === 'string' && value !== '' && !isNaN(Number(value))) return true;
-    return false;
-  });
-  if (found === null || found === undefined || found === '') return null;
-  var num = Number(found);
-  return isNaN(num) ? null : num;
-}
-
-function findFirstImageUrl(obj) {
-  var found = recursiveFindFirst(obj, function(value, keyName) {
-    if (typeof value !== 'string') return false;
-
-    var lowerValue = value.toLowerCase();
-    if (lowerValue.indexOf('http') !== 0) return false;
-
-    var key = String(keyName || '').toLowerCase();
-
-    if (lowerValue.match(/\.(jpg|jpeg|png|webp)(\?|$)/)) return true;
-
-    return (
-      key.indexOf('image') !== -1 ||
-      key.indexOf('thumbnail') !== -1 ||
-      key.indexOf('photo') !== -1 ||
-      key.indexOf('locator') !== -1 ||
-      key.indexOf('contenturl') !== -1 ||
-      key === 'url'
-    );
-  });
-
-  return typeof found === 'string' ? found : '';
-}
-function detectCityKeyFromDatatourisme(cityName) {
-  var city = String(cityName || '').toLowerCase();
-  if (!city) return 'paris';
-  if (city.indexOf('bordeaux') !== -1) return 'bordeaux';
-  if (city.indexOf('lille') !== -1) return 'lille';
-  if (city.indexOf('nantes') !== -1) return 'nantes';
-  if (city.indexOf('rennes') !== -1) return 'rennes';
-  return 'paris';
-}
-
-function toDatatourismeCard(poi, indexOffset) {
-  var title =
-    normalizeLangValue(poi['ebucore:title']) ||
-    normalizeLangValue(poi['dc:title']) ||
-    normalizeLangValue(poi['rdfs:label']) ||
-    normalizeLangValue(poi['schema:name']) ||
-    normalizeLangValue(poi.name) ||
-    findFirstStringForKeys(poi, ['title', 'label', 'name']);
-
-  if (!title) return null;
-
-  var desc =
-    normalizeLangValue(poi['ebucore:comments']) ||
-    normalizeLangValue(poi['dc:description']) ||
-    normalizeLangValue(poi['owl:comment']) ||
-    normalizeLangValue(poi.description) ||
-    findFirstStringForKeys(poi, ['description', 'comment', 'abstract']);
-
-  var city =
-    normalizeLangValue(poi['schema:addressLocality']) ||
-    findFirstStringForKeys(poi, ['addresslocality', 'city', 'commune', 'locality']);
-
-  var address =
-    normalizeLangValue(poi['schema:streetAddress']) ||
-    findFirstStringForKeys(poi, ['streetaddress', 'address']);
-
-  var loc = address || city || 'Île-de-France';
-
-  var lat = findFirstNumberForKeys(poi, ['latitude']);
-  var lng = findFirstNumberForKeys(poi, ['longitude']);
-  if (lat === null || lng === null) return null;
-
-  var image = findFirstImageUrl(poi);
-  if (!image) return null;
-
-  var typeText = JSON.stringify(poi).toLowerCase();
-  var keywords = [];
-
-  if (typeText.indexOf('museum') !== -1 || typeText.indexOf('musée') !== -1 || typeText.indexOf('musee') !== -1) {
-    keywords.push('musée');
-  }
-  if (typeText.indexOf('monument') !== -1 || typeText.indexOf('heritage') !== -1 || typeText.indexOf('patrimoine') !== -1) {
-    keywords.push('patrimoine');
-  }
-  if (typeText.indexOf('gallery') !== -1 || typeText.indexOf('galerie') !== -1) {
-    keywords.push('galerie');
-  }
-  if (!keywords.length) keywords = ['culture'];
-
-  var cat = detectCategory(keywords, title, desc || '');
-  var distanceKm = null;
-  var distanceLabel = city || 'Île-de-France';
-
-  if (USER_LOCATION) {
-    distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, lat, lng);
-    distanceLabel = formatDistance(distanceKm);
-  }
-
-  var dtId =
-    normalizeLangValue(poi['@id']) ||
-    normalizeLangValue(poi.id) ||
-    ('poi-' + indexOffset);
-
-  var cityKey = detectCityKeyFromDatatourisme(city);
-
-  return {
-    id: 'dt:' + String(dtId),
-    title: title,
-    category: cat,
-    tags: keywords.slice(0, 3),
-    date: 'Lieu permanent',
-    dateISO: null,
-    location: loc + (city && loc.indexOf(city) === -1 ? ', ' + city : ''),
-    lat: lat,
-    lng: lng,
-    city: city,
-    cityKey: cityKey,
-    distance: distanceLabel,
-    distanceKm: distanceKm,
-    price: 0,
-    priceLabel: 'Voir détails',
-    image: image,
-    description: desc || 'Lieu culturel permanent',
-    liked: false,
-    source: 'datatourisme',
-    kind: 'place',
-    isPermanent: true
-  };
-}
-function extractDatatourismePoi(doc) {
-  if (!doc || typeof doc !== 'object') return null;
-
-  var graph = Array.isArray(doc['@graph']) ? doc['@graph'] : [doc];
-
-  var candidates = graph.filter(function(node) {
-    return node && typeof node === 'object';
-  });
-
-  var typed = candidates.find(function(node) {
-    var types = node['@type'];
-    var text = JSON.stringify(types || '').toLowerCase();
-
-    return (
-      text.indexOf('pointofinterest') !== -1 ||
-      text.indexOf('placeofinterest') !== -1 ||
-      text.indexOf('culturalsite') !== -1 ||
-      text.indexOf('museum') !== -1 ||
-      text.indexOf('touristattraction') !== -1 ||
-      text.indexOf('heritagesite') !== -1
-    );
-  });
-
-  return typed || candidates[0] || null;
-}
-function shouldLoadDatatourisme() {
-  return SELECTED_CITIES.indexOf('paris') !== -1;
-}
-function loadDatatourismePlaces() {
-  if (!shouldLoadDatatourisme()) return Promise.resolve([]);
-  if (DATATOURISME_LOADED || DATATOURISME_LOADING) return Promise.resolve([]);
-
-  if (typeof JSZip === 'undefined') {
-    console.error('JSZip n\'est pas chargé');
-    return Promise.resolve([]);
-  }
-
-  DATATOURISME_LOADING = true;
-
-  return fetch(DATATOURISME_FLOW_URL)
-    .then(function(res) { return res.arrayBuffer(); })
-    .then(function(buffer) { return JSZip.loadAsync(buffer); })
-    .then(function(zip) {
-      var jsonFiles = [];
-
-      zip.forEach(function(relativePath, file) {
-        var lower = relativePath.toLowerCase();
-        if (file.dir) return;
-        if (!lower.endsWith('.json')) return;
-        if (lower.indexOf('index') !== -1) return;
-        if (lower.indexOf('context') !== -1) return;
-        jsonFiles.push(file);
-      });
-
-      return Promise.all(jsonFiles.map(function(file) {
-        return file.async('string').then(function(text) {
-          try {
-            return JSON.parse(text);
-          } catch (e) {
-            return null;
-          }
-        });
-      }));
-    })
-    .then(function(items) {
-      var cards = (items || [])
-        .filter(Boolean)
-        .map(function(item) {
-          return extractDatatourismePoi(item);
-        })
-        .filter(Boolean)
-        .map(function(poi, i) {
-          return toDatatourismeCard(poi, i);
-        })
-        .filter(Boolean)
-        .filter(function(card) {
-          var id = String(card.id || '');
-          if (!id) return false;
-          if (LOADED_EVENT_IDS[id]) return false;
-          if (isEventSeen(id)) return false;
-          LOADED_EVENT_IDS[id] = true;
-          return true;
-        });
-
-      DATATOURISME_LOADED = true;
-      DATATOURISME_LOADING = false;
-      console.log('DATATOURISME cards =', cards.length);
-      return cards;
-    })
-    .catch(function(err) {
-      console.error('loadDatatourismePlaces error:', err);
-      DATATOURISME_LOADING = false;
-      return [];
-    });
-}
-
 function loadEvents() {
   if (EVENTS_LOADING || EVENTS_EXHAUSTED) return Promise.resolve();
   if (AGENDAS.length === 0) buildAgendaList();
@@ -607,11 +281,8 @@ function loadEvents() {
     });
   }
 
-  return Promise.all([openAgendaPromise, loadDatatourismePlaces()])
-    .then(function(results) {
-      var allOpenAgenda = results[0] || [];
-      var datatourismeCards = results[1] || [];
-
+  return openAgendaPromise
+    .then(function(allOpenAgenda) {
       var newEvents = allOpenAgenda
         .filter(function(e) {
           var eventId = String(e.uid || '');
@@ -627,8 +298,7 @@ function loadEvents() {
         })
         .map(function(e, i) {
           return toEventCard(e, EVENTS.length + i, e.__cityKey);
-        })
-        .concat(datatourismeCards);
+        });
 
       if (USER_LOCATION) {
         newEvents.sort(function(a, b) {
@@ -638,8 +308,6 @@ function loadEvents() {
         });
       } else {
         newEvents.sort(function(a, b) {
-          if (a.isPermanent && !b.isPermanent) return 1;
-          if (!a.isPermanent && b.isPermanent) return -1;
           if (!a.dateISO || !b.dateISO) return 0;
           return new Date(a.dateISO) - new Date(b.dateISO);
         });
