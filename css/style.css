@@ -673,8 +673,6 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px;
 .star.half  { color: #f59e0b; opacity: 0.6; }
 .star.empty { color: var(--bg3); }
 
-#review-star-picker span {
-  transition: color 0.1s; user-select: none;
-}
-.star-pick-half { font-size: 28px; clip-path: inset(0 50% 0 0); margin-right: -14px; z-index: 1; position: relative; }
-.star-pick-full  { font-size: 28px; }
+#review-star-picker { display: flex; gap: 4px; }
+#review-star-picker [data-value] { transition: color 0.1s; user-select: none; }
+.star-pick-wrapper { user-select: none; }
