@@ -43,12 +43,6 @@ SELECT DISTINCT ?item ?name ?desc ?image ?lat ?lng ?type ?article ?website ?hour
   { ?item wdt:P31/wdt:P279* wd:Q23413 . BIND("monument" AS ?type) }\
   UNION\
   { ?item wdt:P31/wdt:P279* wd:Q839954 . BIND("monument" AS ?type) }\
-  UNION\
-  { ?item wdt:P31/wdt:P279* wd:Q22698 . BIND("parc" AS ?type) }\
-  UNION\
-  { ?item wdt:P31/wdt:P279* wd:Q1107656 . BIND("parc" AS ?type) }\
-  UNION\
-  { ?item wdt:P31/wdt:P279* wd:Q24354 . BIND("spectacle" AS ?type) }\
   ?item wdt:P625 ?coordsVal .\
   BIND(geof:latitude(?coordsVal) AS ?lat)\
   BIND(geof:longitude(?coordsVal) AS ?lng)\
