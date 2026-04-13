@@ -6,7 +6,7 @@ var pendingRequests = [];
 function loadFriends() {
   if (!currentUser) return;
   sb.from('friendships')
-    .select('*, requester:requester_id(id, username), receiver:receiver_id(id, username)')
+    .select('*, requester:requester_id(id, username, score), receiver:receiver_id(id, username, score)')
     .or('requester_id.eq.' + currentUser.id + ',receiver_id.eq.' + currentUser.id)
     .eq('status', 'accepted')
     .then(function(res) {
@@ -21,7 +21,7 @@ function loadFriends() {
 function loadPendingRequests() {
   if (!currentUser) return;
   sb.from('friendships')
-    .select('*, requester:requester_id(id, username)')
+    .select('*, requester:requester_id(id, username, score)')
     .eq('receiver_id', currentUser.id)
     .eq('status', 'pending')
     .then(function(res) {
@@ -46,7 +46,7 @@ function searchUsers(query) {
   // On récupère un ensemble large et on filtre côté client pour ignorer accents et casse
   var normalized = normalizeStr(query);
   return sb.from('profiles')
-    .select('id, username')
+    .select('id, username, score')
     .ilike('username', '%' + query + '%')
     .neq('id', currentUser.id)
     .limit(30)
@@ -142,7 +142,7 @@ function renderFriendsList() {
     if (!f) return '';
     return '<div class="friend-item">' +
       '<div class="friend-avatar">' + f.username.charAt(0).toUpperCase() + '</div>' +
-      '<div class="friend-name">' + f.username + '</div>' +
+      '<div class="friend-name">' + (typeof getGrade === 'function' ? getGrade(f.score || 0).emoji + ' ' : '') + f.username + '</div>' +
       '<button class="friend-menu-btn" data-fid="' + f.id + '" data-fname="' + f.username + '">⋮</button>' +
     '</div>';
   }).join('');
@@ -200,7 +200,7 @@ function renderPendingRequests() {
     var item = document.createElement('div');
     item.className = 'friend-item';
     item.innerHTML = '<div class="friend-avatar">' + r.requester.username.charAt(0).toUpperCase() + '</div>' +
-      '<div class="friend-name">' + r.requester.username + '</div>';
+      '<div class="friend-name">' + (typeof getGrade === 'function' ? getGrade(r.requester.score || 0).emoji + ' ' : '') + r.requester.username + '</div>';
     var actions = document.createElement('div');
     actions.className = 'friend-actions';
     var accept = document.createElement('button');
@@ -228,7 +228,7 @@ function renderSearchResults(users) {
     var item = document.createElement('div');
     item.className = 'friend-item';
     item.innerHTML = '<div class="friend-avatar">' + u.username.charAt(0).toUpperCase() + '</div>' +
-      '<div class="friend-name">' + u.username + '</div>';
+      '<div class="friend-name">' + (typeof getGrade === 'function' ? getGrade(u.score || 0).emoji + ' ' : '') + u.username + '</div>';
     if (isFriend) {
       var badge = document.createElement('div');
       badge.className = 'friend-badge';
