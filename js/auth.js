@@ -128,11 +128,16 @@ function openProfileModal() {
 }
 
 // Fermer le modal en cliquant en dehors
-document.addEventListener('click', function(e) {
+// On utilise mousedown au lieu de click, et on vérifie que le bouton profil
+// (ou l'un de ses enfants SVG) n'est pas la cible
+document.addEventListener('mousedown', function(e) {
   var modal = document.getElementById('profile-modal');
   if (!modal || modal.classList.contains('hidden')) return;
-  var content = modal.querySelector('.modal-content');
-  if (content && !content.contains(e.target) && e.target !== document.getElementById('btn-profile')) {
+  var modalContent = modal.querySelector('.modal-content');
+  var btnProfile = document.getElementById('btn-profile');
+  var clickInsideModal = modalContent && modalContent.contains(e.target);
+  var clickOnBtn = btnProfile && (btnProfile === e.target || btnProfile.contains(e.target));
+  if (!clickInsideModal && !clickOnBtn) {
     modal.classList.add('hidden');
   }
 });
