@@ -184,45 +184,55 @@ function renderReviewStarPicker(currentRating) {
   var container = document.getElementById('review-star-picker');
   if (!container) return;
   container.innerHTML = '';
+
   for (var i = 1; i <= 5; i++) {
     (function(starIndex) {
-      // Demi-étoile
-      var half = document.createElement('span');
-      half.className = 'star-pick-half';
-      half.dataset.value = starIndex - 0.5;
-      half.innerHTML = '★';
-      half.style.color = currentRating >= starIndex - 0.5 ? '#f59e0b' : 'var(--bg3)';
+      // Wrapper pour les deux moitiés d'une étoile
+      var wrapper = document.createElement('span');
+      wrapper.className = 'star-pick-wrapper';
+      wrapper.style.cssText = 'position:relative;display:inline-block;font-size:36px;cursor:pointer;line-height:1';
 
-      // Étoile entière
-      var full = document.createElement('span');
-      full.className = 'star-pick-full';
-      full.dataset.value = starIndex;
-      full.innerHTML = '★';
-      full.style.color = currentRating >= starIndex ? '#f59e0b' : 'var(--bg3)';
+      // Moitié gauche (demi-étoile)
+      var left = document.createElement('span');
+      left.dataset.value = starIndex - 0.5;
+      left.style.cssText = 'position:absolute;left:0;top:0;width:50%;height:100%;overflow:hidden;color:' +
+        (currentRating >= starIndex - 0.5 ? '#f59e0b' : 'var(--bg3)');
+      left.innerHTML = '★';
 
-      [half, full].forEach(function(el) {
-        el.addEventListener('click', function() {
-          _reviewRating = parseFloat(el.dataset.value);
-          renderReviewStarPicker(_reviewRating);
-        });
-        el.addEventListener('mouseover', function() {
-          renderReviewStarPickerHover(parseFloat(el.dataset.value));
-        });
-        el.addEventListener('mouseout', function() {
-          renderReviewStarPicker(_reviewRating);
-        });
-      });
+      // Étoile entière (fond)
+      var right = document.createElement('span');
+      right.dataset.value = starIndex;
+      right.style.cssText = 'color:' + (currentRating >= starIndex ? '#f59e0b' : 'var(--bg3)');
+      right.innerHTML = '★';
 
-      container.appendChild(half);
-      container.appendChild(full);
+      wrapper.appendChild(left);
+      wrapper.appendChild(right);
+
+      function applyRating(val) {
+        _reviewRating = val;
+        renderReviewStarPicker(_reviewRating);
+      }
+
+      function applyHover(val) {
+        container.querySelectorAll('[data-value]').forEach(function(el) {
+          el.style.color = parseFloat(el.dataset.value) <= val ? '#f59e0b' : 'var(--bg3)';
+        });
+      }
+
+      left.addEventListener('click',     function() { applyRating(starIndex - 0.5); });
+      right.addEventListener('click',    function() { applyRating(starIndex); });
+      left.addEventListener('mouseover', function() { applyHover(starIndex - 0.5); });
+      right.addEventListener('mouseover',function() { applyHover(starIndex); });
+      wrapper.addEventListener('mouseout',function() { renderReviewStarPicker(_reviewRating); });
+
+      container.appendChild(wrapper);
     })(i);
   }
 }
 
 function renderReviewStarPickerHover(hoverVal) {
-  var spans = document.querySelectorAll('#review-star-picker span');
-  spans.forEach(function(span) {
-    span.style.color = parseFloat(span.dataset.value) <= hoverVal ? '#f59e0b' : 'var(--bg3)';
+  document.querySelectorAll('#review-star-picker [data-value]').forEach(function(el) {
+    el.style.color = parseFloat(el.dataset.value) <= hoverVal ? '#f59e0b' : 'var(--bg3)';
   });
 }
 
