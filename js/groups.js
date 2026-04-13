@@ -505,7 +505,7 @@ function renderGroupSwipeDeck() {
     return (groupSwipes[eid] || []).find(function(s) { return s.user_id === currentUser.id; });
   });
   var remaining = EVENTS.filter(function(e) {
-    return mySwipedIds.indexOf(String(e.id)) === -1 && e.cityKey === currentGroup.city;
+    return mySwipedIds.indexOf(String(e.id)) === -1;
   });
   stack.innerHTML = '';
   if (remaining.length === 0) {

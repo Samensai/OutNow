@@ -36,21 +36,11 @@ function startApp() {
   if (appStarted) return;
   appStarted = true;
 
-  var hasCities = false;
-  try {
-    hasCities = !!localStorage.getItem('outnow_cities');
-  } catch (e) {}
-
-  if (!hasCities) {
-    initCityScreen();
-    showScreen('cities');
-  } else {
-    showScreen('home');
-    loadEvents().then(function() {
-      buildDeck();
-      renderCards();
-    });
-  }
+  showScreen('home');
+  loadEvents().then(function() {
+    buildDeck();
+    renderCards();
+  });
 
   updateProfileUI();
 

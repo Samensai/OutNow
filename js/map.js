@@ -3,6 +3,8 @@ var mapMarkers = [];
 var mapSelectedDate = null;
 var mapUserMarker = null;
 
+var PARIS_CENTER = [48.8566, 2.3522];
+
 function showMapLoading(message) {
   var loadingEl = document.getElementById('map-loading');
   if (!loadingEl) return;
@@ -55,8 +57,10 @@ function getMapSourceEvents() {
 function initMap() {
   if (mapInstance) return;
 
+  var center = USER_LOCATION ? [USER_LOCATION.lat, USER_LOCATION.lng] : PARIS_CENTER;
+
   mapInstance = L.map('map-container', {
-    center: [USER_LOCATION.lat, USER_LOCATION.lng],
+    center: center,
     zoom: 13,
     zoomControl: true
   });
@@ -66,28 +70,25 @@ function initMap() {
     maxZoom: 19
   }).addTo(mapInstance);
 
-  var userIcon = L.divIcon({
-    html: '<div style="position:relative;width:24px;height:24px">' +
-      '<div style="position:absolute;inset:0;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(59,130,246,0.6)"></div>' +
-      '<div style="position:absolute;inset:-6px;background:rgba(59,130,246,0.2);border-radius:50%;animation:pulse 2s infinite"></div>' +
-    '</div>',
-    className: '',
-    iconSize: [24, 24],
-    iconAnchor: [12, 12]
-  });
+  if (USER_LOCATION) {
+    var userIcon = L.divIcon({
+      html: '<div style="position:relative;width:24px;height:24px">' +
+        '<div style="position:absolute;inset:0;background:#3b82f6;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(59,130,246,0.6)"></div>' +
+        '<div style="position:absolute;inset:-6px;background:rgba(59,130,246,0.2);border-radius:50%;animation:pulse 2s infinite"></div>' +
+      '</div>',
+      className: '',
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
 
-  mapUserMarker = L.marker([USER_LOCATION.lat, USER_LOCATION.lng], {
-    icon: userIcon,
-    zIndexOffset: 1000
-  }).addTo(mapInstance).bindPopup('<b>Vous êtes ici</b>');
+    mapUserMarker = L.marker([USER_LOCATION.lat, USER_LOCATION.lng], {
+      icon: userIcon,
+      zIndexOffset: 1000
+    }).addTo(mapInstance).bindPopup('<b>Vous êtes ici</b>');
+  }
 
-  mapInstance.on('moveend', function() {
-    toggleMapSearchButton(true);
-  });
-
-  mapInstance.on('zoomend', function() {
-    toggleMapSearchButton(true);
-  });
+  mapInstance.on('moveend', function() { toggleMapSearchButton(true); });
+  mapInstance.on('zoomend', function() { toggleMapSearchButton(true); });
 
   renderMapEvents();
 }
@@ -170,22 +171,18 @@ function openMapScreen() {
     n.classList.remove('active');
   });
 
-  showMapLoading('Autorise la localisation pour utiliser la carte');
+  showMapLoading('Chargement de la carte...');
 
+  // Demande la localisation mais n'en a pas besoin pour afficher la carte
   requestUserLocation().then(function(location) {
-    if (!location) {
-      showMapLoading('Autorise la localisation pour utiliser la carte');
-      return;
-    }
-
     function finishMapOpen() {
       hideMapLoading();
 
       if (!mapInstance) {
         initMap();
       } else {
-        mapInstance.setView([USER_LOCATION.lat, USER_LOCATION.lng], 13);
-        if (mapUserMarker) {
+        // Si on a obtenu la localisation, recentrer sur l'utilisateur
+        if (USER_LOCATION && mapUserMarker) {
           mapUserMarker.setLatLng([USER_LOCATION.lat, USER_LOCATION.lng]);
         }
         renderMapEvents();
@@ -205,12 +202,14 @@ function openMapScreen() {
       loadEvents().then(function() {
         buildDeck();
 
-        EVENTS.forEach(function(e) {
-          if (e.lat && e.lng && USER_LOCATION) {
-            e.distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, e.lat, e.lng);
-            e.distance = formatDistance(e.distanceKm);
-          }
-        });
+        if (USER_LOCATION) {
+          EVENTS.forEach(function(e) {
+            if (e.lat && e.lng) {
+              e.distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, e.lat, e.lng);
+              e.distance = formatDistance(e.distanceKm);
+            }
+          });
+        }
 
         if (!EVENTS_EXHAUSTED) {
           loadAll();

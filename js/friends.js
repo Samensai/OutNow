@@ -106,14 +106,9 @@ function createGroupWithFriend(friendId, friendName) {
 
   setTimeout(function() {
     var picker = document.getElementById('friend-picker');
-    var citySelect = document.getElementById('new-group-city');
 
-    if (!picker || !citySelect) return;
 
-    citySelect.innerHTML = (SELECTED_CITIES || []).map(function(cityKey) {
-      var label = CITIES[cityKey] ? CITIES[cityKey].label : cityKey;
-      return '<option value="' + cityKey + '">' + label + '</option>';
-    }).join('');
+    if (!picker ) return;
 
     picker.innerHTML = friendsList.map(function(f) {
       return '<label class="friend-pick-item">' +
