@@ -402,20 +402,47 @@ function loadEvents() {
         })
         .concat(wikidataCards);
 
+      // Mélange : on intercale les lieux permanents entre les événements datés
+      // pour éviter d'avoir tous les temporaires d'un côté et tous les permanents de l'autre
+      var temporaires = newEvents.filter(function(e) { return !e.isPermanent; });
+      var permanents  = newEvents.filter(function(e) { return e.isPermanent; });
+
+      // Tri interne : les temporaires par date, les permanents aléatoirement
       if (USER_LOCATION) {
-        newEvents.sort(function(a, b) {
-          var da = a.distanceKm !== null && a.distanceKm !== undefined ? a.distanceKm : 999999;
-          var db = b.distanceKm !== null && b.distanceKm !== undefined ? b.distanceKm : 999999;
+        temporaires.sort(function(a, b) {
+          var da = a.distanceKm != null ? a.distanceKm : 999999;
+          var db = b.distanceKm != null ? b.distanceKm : 999999;
+          return da - db;
+        });
+        permanents.sort(function(a, b) {
+          var da = a.distanceKm != null ? a.distanceKm : 999999;
+          var db = b.distanceKm != null ? b.distanceKm : 999999;
           return da - db;
         });
       } else {
-        newEvents.sort(function(a, b) {
-          // Les lieux permanents passent après les événements datés
-          if (a.isPermanent && !b.isPermanent) return 1;
-          if (!a.isPermanent && b.isPermanent) return -1;
+        temporaires.sort(function(a, b) {
           if (!a.dateISO || !b.dateISO) return 0;
           return new Date(a.dateISO) - new Date(b.dateISO);
         });
+        // Mélange aléatoire des permanents
+        for (var pi = permanents.length - 1; pi > 0; pi--) {
+          var pj = Math.floor(Math.random() * (pi + 1));
+          var tmp = permanents[pi]; permanents[pi] = permanents[pj]; permanents[pj] = tmp;
+        }
+      }
+
+      // Intercalage : 1 permanent toutes les ~3 cartes temporaires
+      newEvents = [];
+      var ti = 0, pi2 = 0;
+      while (ti < temporaires.length || pi2 < permanents.length) {
+        // 2 temporaires
+        for (var k = 0; k < 2 && ti < temporaires.length; k++, ti++) {
+          newEvents.push(temporaires[ti]);
+        }
+        // 1 permanent
+        if (pi2 < permanents.length) {
+          newEvents.push(permanents[pi2++]);
+        }
       }
 
       EVENTS = EVENTS.concat(newEvents);
