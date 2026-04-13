@@ -97,6 +97,30 @@
       <button class="cat-pill" data-cat="sport">⚽ Sport</button>
       <button class="cat-pill" data-cat="food">🍕 Food</button>
     </div>
+    <div id="home-loading" style="position:absolute;inset:0;z-index:5;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px">
+      <div class="outnow-loader animate" id="loader-home">
+        <svg viewBox="0 0 220 220" xmlns="http://www.w3.org/2000/svg" width="110" height="110">
+          <defs>
+            <mask id="route-mask-loader-home">
+              <rect width="220" height="220" fill="black"></rect>
+              <path class="reveal reveal-left"     pathLength="100" d="M58 170 L58 76"    stroke="white" fill="none" stroke-width="11" stroke-linecap="round"></path>
+              <path class="reveal reveal-diagonal" pathLength="100" d="M58 76 L128 170"   stroke="white" fill="none" stroke-width="11" stroke-linecap="round"></path>
+              <path class="reveal reveal-right"    pathLength="100" d="M128 170 L128 70"  stroke="white" fill="none" stroke-width="11" stroke-linecap="round"></path>
+            </mask>
+          </defs>
+          <g mask="url(#route-mask-loader-home)">
+            <path class="route" d="M58 170 L58 76"></path>
+            <path class="route" d="M58 76 L128 170"></path>
+            <path class="route" d="M128 170 L128 70"></path>
+          </g>
+          <g class="pin-wrap">
+            <path class="pin" pathLength="100" d="M128 70 C128 70 102 56 102 35 C102 15 117 4 128 4 C139 4 154 15 154 35 C154 56 128 70 128 70 Z"></path>
+            <circle class="pin-hole" pathLength="100" cx="128" cy="32" r="8"></circle>
+          </g>
+        </svg>
+      </div>
+      <div style="color:var(--text2);font-size:13px;letter-spacing:0.05em">Chargement…</div>
+    </div>
     <div class="card-stack" id="card-stack"></div>
     <div class="action-bar">
       <button class="action-btn dislike" id="btn-dislike">
