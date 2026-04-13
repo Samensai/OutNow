@@ -23,14 +23,15 @@ var SEEN_IDS = {};
 var WIKIDATA_LOADED = false;
 var WIKIDATA_LOADING = false;
 
-// Requête SPARQL : musées, galeries, monuments à Paris avec image et coordonnées
+// Requête SPARQL : musées, galeries, monuments à Paris avec image, coordonnées et article Wikipedia FR
 var WIKIDATA_SPARQL = '\
-SELECT DISTINCT ?item ?name ?desc ?image ?lat ?lng ?type WHERE {\
+SELECT DISTINCT ?item ?name ?desc ?image ?lat ?lng ?type ?article WHERE {\
   ?item wdt:P131* wd:Q90 .\
   ?item wdt:P625 ?coords .\
   ?item wdt:P18 ?image .\
   ?item rdfs:label ?name . FILTER(LANG(?name) = "fr")\
   OPTIONAL { ?item schema:description ?desc . FILTER(LANG(?desc) = "fr") }\
+  OPTIONAL { ?article schema:about ?item ; schema:inLanguage "fr" ; schema:isPartOf <https://fr.wikipedia.org/> . }\
   { ?item wdt:P31/wdt:P279* wd:Q33506 . BIND("musee" AS ?type) }\
   UNION\
   { ?item wdt:P31/wdt:P279* wd:Q207694 . BIND("musee" AS ?type) }\
@@ -184,6 +185,26 @@ function wikimediaThumb(url, width) {
     encodeURIComponent(filename) + '?width=' + w;
 }
 
+// Extrait le titre Wikipedia FR depuis l'URL de l'article
+function wikipediaTitleFromUrl(articleUrl) {
+  if (!articleUrl) return null;
+  var parts = articleUrl.split('/wiki/');
+  if (parts.length < 2) return null;
+  return decodeURIComponent(parts[1]);
+}
+
+// Appelle l'API REST Wikipedia pour récupérer le résumé d'un article
+function fetchWikipediaSummary(title) {
+  var url = 'https://fr.wikipedia.org/api/rest_v1/page/summary/' + encodeURIComponent(title);
+  return fetch(url, { headers: { 'Accept': 'application/json' } })
+    .then(function(res) { return res.ok ? res.json() : null; })
+    .then(function(data) {
+      // extract retourne le texte brut du résumé (sans balises HTML)
+      return data && data.extract ? data.extract : null;
+    })
+    .catch(function() { return null; });
+}
+
 function toWikidataCard(row, index) {
   var name = row.name && row.name.value ? row.name.value : null;
   if (!name) return null;
@@ -199,6 +220,7 @@ function toWikidataCard(row, index) {
   var desc = row.desc && row.desc.value ? row.desc.value : 'Lieu culturel parisien';
   var type = row.type && row.type.value ? row.type.value : 'musee';
   var itemId = row.item && row.item.value ? row.item.value.split('/').pop() : ('wd-' + index);
+  var articleUrl = row.article && row.article.value ? row.article.value : null;
 
   var id = 'wd:' + itemId;
   if (LOADED_EVENT_IDS[id]) return null;
@@ -232,7 +254,8 @@ function toWikidataCard(row, index) {
     price: 0,
     priceLabel: 'Voir détails',
     image: image,
-    description: desc,
+    description: desc,           // fallback Wikidata, remplacé ensuite si Wikipedia disponible
+    wikipediaTitle: wikipediaTitleFromUrl(articleUrl),
     liked: false,
     source: 'wikidata',
     kind: 'place',
@@ -254,10 +277,36 @@ function loadWikidataPlaces() {
         .map(function(row, i) { return toWikidataCard(row, i); })
         .filter(Boolean);
 
-      WIKIDATA_LOADED = true;
-      WIKIDATA_LOADING = false;
-      console.log('WIKIDATA cards =', cards.length);
-      return cards;
+      // Enrichissement Wikipedia : on lance les appels en parallèle (max 8 simultanés)
+      // pour ne pas surcharger l'API et respecter un délai raisonnable
+      function enrichBatch(cards, batchSize) {
+        var batches = [];
+        for (var i = 0; i < cards.length; i += batchSize) {
+          batches.push(cards.slice(i, i + batchSize));
+        }
+        return batches.reduce(function(chain, batch) {
+          return chain.then(function() {
+            return Promise.all(batch.map(function(card) {
+              if (!card.wikipediaTitle) return Promise.resolve();
+              return fetchWikipediaSummary(card.wikipediaTitle).then(function(extract) {
+                if (extract) {
+                  // On tronque à 500 caractères pour garder quelque chose de lisible
+                  card.description = extract.length > 500
+                    ? extract.slice(0, 497) + '…'
+                    : extract;
+                }
+              });
+            }));
+          });
+        }, Promise.resolve());
+      }
+
+      return enrichBatch(cards, 8).then(function() {
+        WIKIDATA_LOADED = true;
+        WIKIDATA_LOADING = false;
+        console.log('WIKIDATA cards =', cards.length);
+        return cards;
+      });
     })
     .catch(function(err) {
       console.error('loadWikidataPlaces error:', err);
