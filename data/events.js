@@ -19,6 +19,32 @@ var AGENDAS = [];
 var LOADED_EVENT_IDS = {};
 var SEEN_IDS = {};
 
+// ── Wikidata lieux culturels permanents ──
+var WIKIDATA_LOADED = false;
+var WIKIDATA_LOADING = false;
+
+// Requête SPARQL : musées, galeries, monuments à Paris avec image et coordonnées
+var WIKIDATA_SPARQL = '\
+SELECT DISTINCT ?item ?name ?desc ?image ?lat ?lng ?type WHERE {\
+  ?item wdt:P131* wd:Q90 .\
+  ?item wdt:P625 ?coords .\
+  ?item wdt:P18 ?image .\
+  ?item rdfs:label ?name . FILTER(LANG(?name) = "fr")\
+  OPTIONAL { ?item schema:description ?desc . FILTER(LANG(?desc) = "fr") }\
+  { ?item wdt:P31/wdt:P279* wd:Q33506 . BIND("musee" AS ?type) }\
+  UNION\
+  { ?item wdt:P31/wdt:P279* wd:Q207694 . BIND("musee" AS ?type) }\
+  UNION\
+  { ?item wdt:P31/wdt:P279* wd:Q1007870 . BIND("galerie" AS ?type) }\
+  UNION\
+  { ?item wdt:P31/wdt:P279* wd:Q23413 . BIND("monument" AS ?type) }\
+  UNION\
+  { ?item wdt:P31/wdt:P279* wd:Q839954 . BIND("monument" AS ?type) }\
+  ?item wdt:P625 ?coordsVal .\
+  BIND(geof:latitude(?coordsVal) AS ?lat)\
+  BIND(geof:longitude(?coordsVal) AS ?lng)\
+  FILTER(?lat > 48.8 && ?lat < 48.92 && ?lng > 2.25 && ?lng < 2.42)\
+} LIMIT 120';
 
 try {
   var savedSeenIds = localStorage.getItem('outnow_seen_event_ids');
@@ -62,32 +88,21 @@ function resetLoadedEvents() {
   LOADED_EVENT_IDS = {};
   EVENTS_LOADING = false;
   EVENTS_EXHAUSTED = false;
+  WIKIDATA_LOADED = false;
+  WIKIDATA_LOADING = false;
   buildAgendaList();
 }
 
 function requestUserLocation() {
   return new Promise(function(resolve) {
-    if (!navigator.geolocation) {
-      resolve(null);
-      return;
-    }
-
+    if (!navigator.geolocation) { resolve(null); return; }
     navigator.geolocation.getCurrentPosition(
       function(pos) {
-        USER_LOCATION = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        };
+        USER_LOCATION = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         resolve(USER_LOCATION);
       },
-      function() {
-        resolve(null);
-      },
-      {
-        timeout: 8000,
-        maximumAge: 300000,
-        enableHighAccuracy: true
-      }
+      function() { resolve(null); },
+      { timeout: 8000, maximumAge: 300000, enableHighAccuracy: true }
     );
   });
 }
@@ -157,6 +172,100 @@ function fallbackImage(i) {
   return imgs[i % imgs.length];
 }
 
+// Convertit une URL d'image Wikimedia Commons en URL directe redimensionnée
+function wikimediaThumb(url, width) {
+  if (!url) return '';
+  // L'URL brute de Wikidata ressemble à :
+  // http://commons.wikimedia.org/wiki/Special:FilePath/Louvre_Museum_Wikimedia_Commons.jpg
+  // On la transforme en URL de thumbnail via l'API Wikimedia
+  var filename = decodeURIComponent(url.split('/').pop()).replace(/ /g, '_');
+  var w = width || 600;
+  return 'https://commons.wikimedia.org/wiki/Special:FilePath/' +
+    encodeURIComponent(filename) + '?width=' + w;
+}
+
+function toWikidataCard(row, index) {
+  var name = row.name && row.name.value ? row.name.value : null;
+  if (!name) return null;
+
+  var lat = row.lat && row.lat.value ? parseFloat(row.lat.value) : null;
+  var lng = row.lng && row.lng.value ? parseFloat(row.lng.value) : null;
+  if (!lat || !lng) return null;
+
+  var rawImage = row.image && row.image.value ? row.image.value : null;
+  if (!rawImage) return null;
+
+  var image = wikimediaThumb(rawImage, 600);
+  var desc = row.desc && row.desc.value ? row.desc.value : 'Lieu culturel parisien';
+  var type = row.type && row.type.value ? row.type.value : 'musee';
+  var itemId = row.item && row.item.value ? row.item.value.split('/').pop() : ('wd-' + index);
+
+  var id = 'wd:' + itemId;
+  if (LOADED_EVENT_IDS[id]) return null;
+  if (isEventSeen(id)) return null;
+  LOADED_EVENT_IDS[id] = true;
+
+  var keywords = [type === 'galerie' ? 'galerie' : type === 'monument' ? 'monument' : 'musée'];
+  var cat = detectCategory(keywords, name, desc);
+
+  var distanceKm = null;
+  var distanceLabel = 'Paris';
+  if (USER_LOCATION) {
+    distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, lat, lng);
+    distanceLabel = formatDistance(distanceKm);
+  }
+
+  return {
+    id: id,
+    title: name,
+    category: cat,
+    tags: keywords.slice(0, 3),
+    date: 'Lieu permanent',
+    dateISO: null,
+    location: 'Paris',
+    lat: lat,
+    lng: lng,
+    city: 'Paris',
+    cityKey: 'paris',
+    distance: distanceLabel,
+    distanceKm: distanceKm,
+    price: 0,
+    priceLabel: 'Voir détails',
+    image: image,
+    description: desc,
+    liked: false,
+    source: 'wikidata',
+    kind: 'place',
+    isPermanent: true
+  };
+}
+
+function loadWikidataPlaces() {
+  if (WIKIDATA_LOADED || WIKIDATA_LOADING) return Promise.resolve([]);
+  WIKIDATA_LOADING = true;
+
+  var url = 'https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(WIKIDATA_SPARQL);
+
+  return fetch(url, { headers: { 'Accept': 'application/sparql-results+json' } })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      var rows = (data.results && data.results.bindings) ? data.results.bindings : [];
+      var cards = rows
+        .map(function(row, i) { return toWikidataCard(row, i); })
+        .filter(Boolean);
+
+      WIKIDATA_LOADED = true;
+      WIKIDATA_LOADING = false;
+      console.log('WIKIDATA cards =', cards.length);
+      return cards;
+    })
+    .catch(function(err) {
+      console.error('loadWikidataPlaces error:', err);
+      WIKIDATA_LOADING = false;
+      return [];
+    });
+}
+
 function toEventCard(e, indexOffset, cityKey) {
   var title = (e.title && (e.title.fr || e.title.en)) || 'Evenement';
   var desc = (e.description && (e.description.fr || e.description.en)) || '';
@@ -179,11 +288,7 @@ function toEventCard(e, indexOffset, cityKey) {
     dateISO = timing.begin;
     var d = new Date(timing.begin);
     dateStr = d.toLocaleDateString('fr-FR', {
-      weekday: 'long',
-      day: 'numeric',
-      month: 'long',
-      hour: '2-digit',
-      minute: '2-digit'
+      weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit'
     });
   }
 
@@ -197,7 +302,7 @@ function toEventCard(e, indexOffset, cityKey) {
   if (tags.length === 0) tags = [cat];
 
   var distanceKm = null;
-  var distanceLabel = city || 'France';
+  var distanceLabel = city || 'Paris';
   if (USER_LOCATION && lat && lng) {
     distanceKm = getDistanceKm(USER_LOCATION.lat, USER_LOCATION.lng, lat, lng);
     distanceLabel = formatDistance(distanceKm);
@@ -235,9 +340,7 @@ function loadEvents() {
   EVENTS_LOADING = true;
 
   var now = new Date();
-  var activeAgendas = AGENDAS.filter(function(a) {
-    return !a.done;
-  });
+  var activeAgendas = AGENDAS.filter(function(a) { return !a.done; });
 
   var openAgendaPromise;
 
@@ -266,23 +369,21 @@ function loadEvents() {
             return evt;
           });
         })
-        .catch(function() {
-          agenda.done = true;
-          return [];
-        });
+        .catch(function() { agenda.done = true; return []; });
     });
 
     openAgendaPromise = Promise.all(requests).then(function(results) {
       var all = [];
-      results.forEach(function(items) {
-        all = all.concat(items);
-      });
+      results.forEach(function(items) { all = all.concat(items); });
       return all;
     });
   }
 
-  return openAgendaPromise
-    .then(function(allOpenAgenda) {
+  return Promise.all([openAgendaPromise, loadWikidataPlaces()])
+    .then(function(results) {
+      var allOpenAgenda = results[0] || [];
+      var wikidataCards = results[1] || [];
+
       var newEvents = allOpenAgenda
         .filter(function(e) {
           var eventId = String(e.uid || '');
@@ -298,7 +399,8 @@ function loadEvents() {
         })
         .map(function(e, i) {
           return toEventCard(e, EVENTS.length + i, e.__cityKey);
-        });
+        })
+        .concat(wikidataCards);
 
       if (USER_LOCATION) {
         newEvents.sort(function(a, b) {
@@ -308,6 +410,9 @@ function loadEvents() {
         });
       } else {
         newEvents.sort(function(a, b) {
+          // Les lieux permanents passent après les événements datés
+          if (a.isPermanent && !b.isPermanent) return 1;
+          if (!a.isPermanent && b.isPermanent) return -1;
           if (!a.dateISO || !b.dateISO) return 0;
           return new Date(a.dateISO) - new Date(b.dateISO);
         });
