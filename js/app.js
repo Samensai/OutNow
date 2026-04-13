@@ -433,7 +433,7 @@ function openDetail(ev) {
         ev.location + (ev.distance !== 'Paris' ? ' · ' + ev.distance : '') +
       '</div>' +
       '<div class="detail-desc">' + ev.description + '</div>' +
-      '<div class="detail-price-badge">' + ev.priceLabel + '</div>' +
+      (ev.priceLabel && ev.priceLabel !== 'Voir détails' ? '<div class="detail-price-badge">' + ev.priceLabel + '</div>' : '') +
       '<div class="detail-cta">' +
         '<button class="btn-primary" onclick="likeFromDetail(\'' + ev.id + '\')">' +
           (isLiked ? '❤️ Sauvegardé' : '🤍 Sauvegarder') +
@@ -442,7 +442,7 @@ function openDetail(ev) {
           (isDone ? '✅ Fait !' : '☑️ Marquer comme fait') +
         '</button>' +
       '</div>' +
-      '<button class="btn-leave-review" onclick="openReviewModal(\'' + ev.id + '\')">⭐ Laisser un avis</button>' +
+      (isDone ? '<button class="btn-leave-review" onclick="openReviewModal(\'' + ev.id + '\')">⭐ Laisser un avis</button>' : '') +
       '<div id="detail-reviews-section" style="margin-top:16px"></div>' +
     '</div>';
 
