@@ -639,3 +639,42 @@ input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 20px;
 .city-emoji { font-size: 32px; }
 .city-name { font-family: var(--font-body); font-size: 15px; font-weight: 600; color: var(--text); }
 .city-btn.active .city-name { color: var(--accent); }
+
+/* ── DONE BADGE ── */
+.like-done-badge {
+  position: absolute; top: 10px; right: 10px;
+  padding: 4px 10px; border-radius: 50px;
+  background: rgba(34,197,94,0.85); color: #fff;
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.5px; backdrop-filter: blur(4px);
+}
+
+/* ── BOUTONS DÉTAIL ── */
+.btn-done {
+  width: 100%; padding: 14px; border-radius: 14px; border: 2px solid var(--bg3);
+  background: transparent; color: var(--text); font-size: 15px; font-weight: 600;
+  margin-top: 10px; cursor: pointer; transition: all 0.2s;
+}
+.btn-done.is-done {
+  border-color: #22c55e; color: #22c55e; background: rgba(34,197,94,0.08);
+}
+.btn-leave-review {
+  display: block; width: 100%; padding: 12px; border-radius: 14px;
+  border: 2px solid var(--accent); background: transparent;
+  color: var(--accent); font-size: 15px; font-weight: 600;
+  margin-top: 10px; cursor: pointer; text-align: center;
+  transition: all 0.2s;
+}
+.btn-leave-review:active { background: rgba(255,59,92,0.08); }
+
+/* ── ÉTOILES ── */
+.stars-display { display: inline-flex; gap: 1px; font-size: 15px; }
+.star.full  { color: #f59e0b; }
+.star.half  { color: #f59e0b; opacity: 0.6; }
+.star.empty { color: var(--bg3); }
+
+#review-star-picker span {
+  transition: color 0.1s; user-select: none;
+}
+.star-pick-half { font-size: 28px; clip-path: inset(0 50% 0 0); margin-right: -14px; z-index: 1; position: relative; }
+.star-pick-full  { font-size: 28px; }
