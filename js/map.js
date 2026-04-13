@@ -9,7 +9,9 @@ function showMapLoading(message) {
   var loadingEl = document.getElementById('map-loading');
   if (!loadingEl) return;
   loadingEl.style.display = 'flex';
-  loadingEl.innerHTML = '<div style="font-size:32px">🗺️</div>' + message;
+  // Le loader SVG est déjà dans le DOM — on met juste à jour le label si besoin
+  var label = loadingEl.querySelector('div:last-child');
+  if (label && message) label.textContent = message;
 }
 
 function hideMapLoading() {
