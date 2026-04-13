@@ -103,6 +103,40 @@ function updateProfileUI() {
   if (el) el.textContent = currentProfile.username;
 }
 
+function openProfileModal() {
+  if (!currentProfile) return;
+
+  // Remplir les infos statiques
+  var username = currentProfile.username || '—';
+  var email = currentProfile.email || (currentUser && currentUser.email) || '—';
+
+  document.getElementById('profile-modal-username').textContent = username;
+  document.getElementById('profile-modal-email').textContent = email;
+  document.getElementById('profile-avatar-letter').textContent = username.charAt(0).toUpperCase();
+
+  // Compter les amis
+  document.getElementById('profile-modal-friends').textContent = '…';
+  sb.from('friendships')
+    .select('id', { count: 'exact', head: true })
+    .or('requester_id.eq.' + currentUser.id + ',receiver_id.eq.' + currentUser.id)
+    .eq('status', 'accepted')
+    .then(function(res) {
+      document.getElementById('profile-modal-friends').textContent = res.count || 0;
+    });
+
+  document.getElementById('profile-modal').classList.remove('hidden');
+}
+
+// Fermer le modal en cliquant en dehors
+document.addEventListener('click', function(e) {
+  var modal = document.getElementById('profile-modal');
+  if (!modal || modal.classList.contains('hidden')) return;
+  var content = modal.querySelector('.modal-content');
+  if (content && !content.contains(e.target) && e.target !== document.getElementById('btn-profile')) {
+    modal.classList.add('hidden');
+  }
+});
+
 // ── TABS ──
 document.getElementById('tab-login').addEventListener('click', function() {
   document.getElementById('tab-login').classList.add('active');
