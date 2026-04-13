@@ -18,12 +18,6 @@ function hideMapLoading() {
   loadingEl.style.display = 'none';
 }
 
-function toggleMapSearchButton(show) {
-  var btn = document.getElementById('btn-map-search-here');
-  if (!btn) return;
-  btn.classList.toggle('hidden', !show);
-}
-
 function getMapEventDateKey(ev) {
   if (!ev) return null;
   if (ev.dateISO && typeof ev.dateISO === 'string') {
@@ -87,32 +81,24 @@ function initMap() {
     }).addTo(mapInstance).bindPopup('<b>Vous êtes ici</b>');
   }
 
-  mapInstance.on('moveend', function() { toggleMapSearchButton(true); });
-  mapInstance.on('zoomend', function() { toggleMapSearchButton(true); });
-
   renderMapEvents();
 }
 
 function renderMapEvents() {
   if (!mapInstance) return;
 
-  mapMarkers.forEach(function(m) {
-    mapInstance.removeLayer(m);
-  });
+  mapMarkers.forEach(function(m) { mapInstance.removeLayer(m); });
   mapMarkers = [];
 
-  var bounds = mapInstance.getBounds();
   var sourceEvents = getMapSourceEvents();
 
   var filtered = sourceEvents.filter(function(e) {
     if (!e || !e.lat || !e.lng) return false;
-
     if (mapSelectedDate) {
       var eventDateKey = getMapEventDateKey(e);
       if (!eventDateKey || eventDateKey !== mapSelectedDate) return false;
     }
-
-    return bounds.contains([e.lat, e.lng]);
+    return true;
   });
 
   var catColors = {
@@ -151,8 +137,6 @@ function renderMapEvents() {
 
     mapMarkers.push(marker);
   });
-
-  toggleMapSearchButton(false);
 }
 
 window.openDetailFromMap = function(eventId) {
@@ -173,15 +157,13 @@ function openMapScreen() {
 
   showMapLoading('Chargement de la carte...');
 
-  // Demande la localisation mais n'en a pas besoin pour afficher la carte
-  requestUserLocation().then(function(location) {
+  requestUserLocation().then(function() {
     function finishMapOpen() {
       hideMapLoading();
 
       if (!mapInstance) {
         initMap();
       } else {
-        // Si on a obtenu la localisation, recentrer sur l'utilisateur
         if (USER_LOCATION && mapUserMarker) {
           mapUserMarker.setLatLng([USER_LOCATION.lat, USER_LOCATION.lng]);
         }
@@ -227,24 +209,3 @@ function setMapDate(dateStr) {
   mapSelectedDate = dateStr || null;
   renderMapEvents();
 }
-
-document.addEventListener('DOMContentLoaded', function() {
-  var btnSearchHere = document.getElementById('btn-map-search-here');
-  if (btnSearchHere) {
-    btnSearchHere.setAttribute('type', 'button');
-
-    btnSearchHere.addEventListener('mousedown', function(e) {
-      e.preventDefault();
-    });
-
-    btnSearchHere.addEventListener('touchstart', function(e) {
-      e.preventDefault();
-    }, { passive: false });
-
-    btnSearchHere.addEventListener('click', function(e) {
-      e.preventDefault();
-      btnSearchHere.blur();
-      renderMapEvents();
-    });
-  }
-});
