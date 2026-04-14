@@ -161,10 +161,6 @@ function renderCards() {
   }
 
   state.deck.slice(0, 3).forEach(function(ev, i) {
-    if (typeof markEventSeen === 'function') {
-      markEventSeen(ev.id);
-    }
-
     var card = createCard(ev, i);
     cardStack.appendChild(card);
 
