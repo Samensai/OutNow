@@ -193,6 +193,11 @@ function openMapScreen() {
 
     function loadAll() {
       if (EVENTS_EXHAUSTED) {
+        // Attendre aussi que Wikidata soit chargé avant d'afficher la carte
+        if (typeof WIKIDATA_LOADING !== 'undefined' && WIKIDATA_LOADING) {
+          setTimeout(loadAll, 200);
+          return;
+        }
         finishMapOpen();
         return;
       }
@@ -212,7 +217,12 @@ function openMapScreen() {
         if (!EVENTS_EXHAUSTED) {
           loadAll();
         } else {
-          finishMapOpen();
+          // Attendre aussi que Wikidata soit chargé
+          if (typeof WIKIDATA_LOADING !== 'undefined' && WIKIDATA_LOADING) {
+            setTimeout(loadAll, 200);
+          } else {
+            finishMapOpen();
+          }
         }
       });
     }
