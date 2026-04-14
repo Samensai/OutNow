@@ -441,8 +441,10 @@ function openDetail(ev) {
 window.handleMarkDone = function(eventId) {
   if (typeof markEventDone !== 'function') return;
   markEventDone(eventId).then(function() {
-    var btn = document.getElementById('btn-mark-done');
-    if (btn) { btn.textContent = '✅ Fait !'; btn.classList.add('is-done'); }
+    // Rafraîchir la fiche entière pour faire apparaître le bouton "Laisser un avis"
+    if (state.currentDetail && String(state.currentDetail.id) === String(eventId)) {
+      openDetail(state.currentDetail);
+    }
     // Rafraîchir les likes pour afficher le badge
     renderLikes();
   });
