@@ -94,27 +94,43 @@ function incrementUserScore() {
 function loadReviewsForEvent(eventId) {
   if (!currentUser) return Promise.resolve([]);
   var eid = String(eventId);
-  // On récupère les avis "everyone" + les avis "friends" de nos amis
-  return sb.from('reviews')
+
+  var publicQuery = sb.from('reviews')
     .select('*, profiles(username, score)')
     .eq('event_id', eid)
     .eq('visibility', 'everyone')
     .order('created_at', { ascending: false })
-    .limit(20)
-    .then(function(res) {
-      var publicReviews = res.data || [];
-      // Avis friends de l'utilisateur connecté
+    .limit(20);
+
+  var friendsQuery = sb.from('friendships')
+    .select('requester_id, receiver_id')
+    .or('requester_id.eq.' + currentUser.id + ',receiver_id.eq.' + currentUser.id)
+    .eq('status', 'accepted');
+
+  return Promise.all([publicQuery, friendsQuery])
+    .then(function(results) {
+      var publicReviews = results[0].data || [];
+      var friendships = results[1].data || [];
+
+      var friendIds = friendships.map(function(f) {
+        return f.requester_id === currentUser.id ? f.receiver_id : f.requester_id;
+      });
+      friendIds.push(currentUser.id);
+
+      if (friendIds.length === 0) return publicReviews;
+
       return sb.from('reviews')
         .select('*, profiles(username, score)')
         .eq('event_id', eid)
         .eq('visibility', 'friends')
-        .eq('user_id', currentUser.id)
-        .then(function(res2) {
-          var myReview = res2.data || [];
-          // Fusionner sans doublons
+        .in('user_id', friendIds)
+        .then(function(res) {
+          var friendReviews = res.data || [];
+          var seenIds = {};
           var merged = publicReviews.slice();
-          myReview.forEach(function(r) {
-            if (!merged.find(function(x) { return x.id === r.id; })) merged.push(r);
+          merged.forEach(function(r) { seenIds[r.id] = true; });
+          friendReviews.forEach(function(r) {
+            if (!seenIds[r.id]) merged.push(r);
           });
           return merged;
         });
@@ -292,7 +308,7 @@ function renderReviewSection(eventId) {
           '<span style="font-weight:600;font-size:13px">' + grade.emoji + ' ' + username + '</span>' +
           renderStarsDisplay(r.rating) +
         '</div>' +
-        (r.comment ? '<div style="font-size:13px;color:var(--text2);line-height:1.4">' + r.comment + '</div>' : '') +
+        (r.comment ? '<div style="font-size:13px;color:var(--text2);line-height:1.4">' + escapeHtml(r.comment) + '</div>' : '') +
       '</div>';
     });
     section.innerHTML = html;
@@ -331,7 +347,7 @@ window.openContributionsModal = function() {
               renderStarsDisplay(r.rating) +
               '<span style="font-size:11px;color:var(--text2)">' + dateStr + '</span>' +
             '</div>' +
-            (r.comment ? '<div style="font-size:13px;color:var(--text2)">' + r.comment + '</div>' : '') +
+            (r.comment ? '<div style="font-size:13px;color:var(--text2)">' + escapeHtml(r.comment) + '</div>' : '') +
             '<div style="font-size:11px;color:var(--bg3);margin-top:2px">' + r.event_id + '</div>' +
           '</div>';
         }).join('');

@@ -1,5 +1,56 @@
 // js/groups.js — Groupes OutNow
 
+function showConfirm(message, okLabel, onOk) {
+  var modal = document.getElementById('confirm-modal');
+  document.getElementById('confirm-modal-text').textContent = message;
+  var okBtn = document.getElementById('confirm-modal-ok');
+  okBtn.textContent = okLabel || 'Confirmer';
+  modal.classList.remove('hidden');
+  function cleanup() {
+    modal.classList.add('hidden');
+  }
+  okBtn.addEventListener('click', function handler() {
+    cleanup(); okBtn.removeEventListener('click', handler); onOk();
+  });
+  document.getElementById('confirm-modal-cancel').addEventListener('click', function handler() {
+    cleanup(); document.getElementById('confirm-modal-cancel').removeEventListener('click', handler);
+  });
+}
+
+function showPrompt(message, defaultValue, onOk) {
+  var modal = document.getElementById('prompt-modal');
+  document.getElementById('prompt-modal-text').textContent = message;
+  var input = document.getElementById('prompt-modal-input');
+  input.value = defaultValue || '';
+  modal.classList.remove('hidden');
+  setTimeout(function() { input.focus(); input.select(); }, 50);
+  var okBtn = document.getElementById('prompt-modal-ok');
+  var cancelBtn = document.getElementById('prompt-modal-cancel');
+  function cleanup() {
+    modal.classList.add('hidden');
+    input.removeEventListener('keydown', handleKey);
+  }
+  function handleOk() { var val = input.value.trim(); cleanup(); okBtn.removeEventListener('click', handleOk); cancelBtn.removeEventListener('click', handleCancel); if (val) onOk(val); }
+  function handleCancel() { cleanup(); okBtn.removeEventListener('click', handleOk); cancelBtn.removeEventListener('click', handleCancel); }
+  function handleKey(e) { if (e.key === 'Enter') handleOk(); if (e.key === 'Escape') handleCancel(); }
+  okBtn.addEventListener('click', handleOk);
+  cancelBtn.addEventListener('click', handleCancel);
+  input.addEventListener('keydown', handleKey);
+}
+
+function showMembersList(names) {
+  var modal = document.getElementById('members-modal');
+  var list = document.getElementById('members-modal-list');
+  list.innerHTML = names.map(function(n) {
+    return '<div style="padding:6px 0;border-bottom:1px solid var(--bg3);font-size:14px">' + escapeHtml(n) + '</div>';
+  }).join('');
+  modal.classList.remove('hidden');
+  document.getElementById('members-modal-close').addEventListener('click', function handler() {
+    modal.classList.add('hidden');
+    document.getElementById('members-modal-close').removeEventListener('click', handler);
+  });
+}
+
 var currentGroup = null;
 var groupMessages = [];
 var groupSwipes = {};
@@ -145,13 +196,13 @@ function showGroupMenu(groupId, groupName, creatorId, anchor) {
 }
 
 function renameGroup(groupId, currentName) {
-  var newName = prompt('Nouveau nom du groupe :', currentName);
-  if (!newName || !newName.trim()) return;
-  sb.from('groups').update({ name: newName.trim() }).eq('id', groupId)
-    .then(function(res) {
-      if (res.error) { alert('Erreur: ' + res.error.message); return; }
-      loadUserGroups();
-    });
+  showPrompt('Nouveau nom du groupe :', currentName, function(newName) {
+    sb.from('groups').update({ name: newName }).eq('id', groupId)
+      .then(function(res) {
+        if (res.error) return;
+        loadUserGroups();
+      });
+  });
 }
 
 function showGroupMembersList(groupId) {
@@ -159,38 +210,31 @@ function showGroupMembersList(groupId) {
     .then(function(res) {
       if (res.error) return;
       var names = (res.data || []).map(function(r) { return r.profiles ? r.profiles.username : '?'; });
-      alert('Membres :\n' + names.join('\n'));
+      showMembersList(names);
     });
 }
 
 function addMemberToGroup(groupId) {
-  var username = prompt('Pseudo de l\'ami a ajouter :');
-  if (!username) return;
-  sb.from('profiles').select('id').eq('username', username.trim()).single()
-    .then(function(res) {
-      if (res.error || !res.data) { alert('Utilisateur introuvable.'); return; }
-      return sb.from('group_members').insert({ group_id: groupId, user_id: res.data.id })
-        .then(function(r) {
-          if (r.error) { alert('Erreur: ' + r.error.message); return; }
-          alert('Membre ajoute !');
-        });
-    });
+  showPrompt('Pseudo de l\'ami à ajouter :', '', function(username) {
+    sb.from('profiles').select('id').eq('username', username).single()
+      .then(function(res) {
+        if (res.error || !res.data) return;
+        return sb.from('group_members').insert({ group_id: groupId, user_id: res.data.id });
+      });
+  });
 }
 
 function deleteGroup(groupId) {
-  // Supprime en parallèle les données liées, puis le groupe
-  Promise.all([
-    sb.from('group_swipes').delete().eq('group_id', groupId),
-    sb.from('group_messages').delete().eq('group_id', groupId),
-    sb.from('group_members').delete().eq('group_id', groupId)
-  ]).then(function(results) {
-    console.log('delete related:', results);
-    return sb.from('groups').delete().eq('id', groupId);
-  }).then(function(res) {
-    console.log('delete group:', res);
-    loadUserGroups();
-  }).catch(function(err) {
-    console.error('deleteGroup error:', err);
+  showConfirm('Supprimer ce groupe ? Cette action est irréversible.', 'Supprimer', function() {
+    Promise.all([
+      sb.from('group_swipes').delete().eq('group_id', groupId),
+      sb.from('group_messages').delete().eq('group_id', groupId),
+      sb.from('group_members').delete().eq('group_id', groupId)
+    ]).then(function() {
+      return sb.from('groups').delete().eq('id', groupId);
+    }).then(function() {
+      loadUserGroups();
+    });
   });
 }
 
@@ -199,11 +243,9 @@ function leaveGroup(groupId) {
     .delete()
     .eq('group_id', groupId)
     .eq('user_id', currentUser.id)
-    .then(function(res) {
-      console.log('leaveGroup:', res);
+    .then(function() {
       loadUserGroups();
-    })
-    .catch(function(err) { console.error('leaveGroup error:', err); });
+    });
 }
 
 // ── CRÉER UN GROUPE ──
@@ -317,7 +359,7 @@ function renderMessages() {
     var authorGrade = (typeof getGrade === 'function' && m.profiles) ? getGrade(m.profiles.score || 0).emoji + ' ' : '';
     return '<div class="message ' + (isMe ? 'message-me' : 'message-them') + '">' +
       (!isMe ? '<div class="message-author">' + authorGrade + author + '</div>' : '') +
-      '<div class="message-bubble">' + m.content + '</div>' +
+      '<div class="message-bubble">' + escapeHtml(m.content) + '</div>' +
     '</div>';
   }).join('');
   el.scrollTop = el.scrollHeight;
@@ -636,7 +678,11 @@ function switchGroupTab(tab) {
   }
 
   if (tab === 'matches' && currentGroup) {
-    loadGroupMatches(currentGroup.id);
+    if (groupMatches.length === 0) {
+      loadGroupMatches(currentGroup.id);
+    } else {
+      renderGroupMatches();
+    }
   }
 
   if (tab === 'swipe') {

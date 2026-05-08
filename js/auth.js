@@ -219,24 +219,13 @@ document.getElementById('btn-login').addEventListener('click', function() {
   if (isEmail) {
     doSignIn(identifier);
   } else {
-    // Chercher l'email correspondant au pseudo dans profiles
     sb.from('profiles')
-      .select('id')
+      .select('email')
       .eq('username', identifier)
       .single()
       .then(function(res) {
-        if (res.error || !res.data) throw new Error('Pseudo introuvable.');
-        // Récupérer l'email via la fonction RPC ou auth admin — 
-        // Supabase ne permet pas de récupérer l'email depuis profiles directement.
-        // On stocke l'email dans profiles à l'inscription, on le lit ici.
-        return sb.from('profiles')
-          .select('email')
-          .eq('username', identifier)
-          .single();
-      })
-      .then(function(res) {
         if (res.error || !res.data || !res.data.email) {
-          throw new Error('Email introuvable pour ce pseudo.');
+          throw new Error('Pseudo introuvable.');
         }
         doSignIn(res.data.email);
       })

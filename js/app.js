@@ -1,5 +1,13 @@
 // js/app.js — OutNow PWA
 
+function escapeHtml(str) {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
 var savedLikesInit = [];
 try {
   var rawLikes = localStorage.getItem('outnow_liked_events');
@@ -14,6 +22,8 @@ var state = {
   liked: savedLikesInit,
   currentDetail: null
 };
+
+var likedIds = new Set(savedLikesInit.map(function(e) { return String(e.id); }));
 
 var previousScreen = 'home';
 
@@ -45,53 +55,27 @@ function showScreen(name) {
   if (target) target.classList.add('active');
 }
 
-function goBack() {
-  if (previousScreen === 'group-detail') {
-    showScreen('group-detail');
-    return;
-  }
-
-  if (previousScreen === 'map') {
+var BACK_ACTIONS = {
+  'group-detail': function() { showScreen('group-detail'); },
+  'map': function() {
     showScreen('map');
-    setTimeout(function() {
-      if (typeof mapInstance !== 'undefined' && mapInstance) {
-        mapInstance.invalidateSize();
-      }
-    }, 100);
-    return;
-  }
+    setTimeout(function() { if (typeof mapInstance !== 'undefined' && mapInstance) mapInstance.invalidateSize(); }, 100);
+  },
+  'likes':   function() { showScreen('likes');   setActiveNav('likes');   renderLikes(); previousScreen = 'home'; },
+  'friends': function() { showScreen('friends'); setActiveNav('friends'); previousScreen = 'home'; },
+  'groups':  function() { showScreen('groups');  setActiveNav('groups');  previousScreen = 'home'; }
+};
 
-  if (previousScreen === 'likes') {
-    showScreen('likes');
-    setActiveNav('likes');
-    renderLikes();
-    previousScreen = 'home';
-    return;
-  }
-
-  if (previousScreen === 'friends') {
-    showScreen('friends');
-    setActiveNav('friends');
-    previousScreen = 'home';
-    return;
-  }
-
-  if (previousScreen === 'groups') {
-    showScreen('groups');
-    setActiveNav('groups');
-    previousScreen = 'home';
-    return;
-  }
-
+function goBack() {
+  var action = BACK_ACTIONS[previousScreen];
+  if (action) { action(); return; }
   showScreen('home');
   setActiveNav('home');
   previousScreen = 'home';
 }
 
 function eventAlreadyLiked(eventId) {
-  return !!state.liked.find(function(item) {
-    return item.id === eventId;
-  });
+  return likedIds.has(String(eventId));
 }
 
 function eventAlreadyDisliked(eventId) {
@@ -298,6 +282,7 @@ function swipeCard(direction, card, ev) {
   if (direction === 'like') {
     if (!eventAlreadyLiked(ev.id)) {
       state.liked.push(ev);
+      likedIds.add(String(ev.id));
       saveLikedEvents();
     }
   } else {
@@ -462,6 +447,7 @@ window.likeFromDetail = function(id) {
 
   if (!eventAlreadyLiked(id)) {
     state.liked.push(ev);
+    likedIds.add(String(id));
     saveLikedEvents();
   }
 
