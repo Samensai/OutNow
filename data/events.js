@@ -58,6 +58,12 @@ try {
 
 function saveSeenIds() {
   try {
+    var keys = Object.keys(SEEN_IDS);
+    if (keys.length > 1000) {
+      var trimmed = {};
+      keys.slice(-500).forEach(function(k) { trimmed[k] = true; });
+      SEEN_IDS = trimmed;
+    }
     localStorage.setItem('outnow_seen_event_ids', JSON.stringify(SEEN_IDS));
   } catch (e) {}
 }
@@ -323,7 +329,6 @@ function loadWikidataPlaces() {
       return enrichBatch(cards, 8).then(function() {
         WIKIDATA_LOADED = true;
         WIKIDATA_LOADING = false;
-        console.log('WIKIDATA cards =', cards.length);
         return cards;
       });
     })

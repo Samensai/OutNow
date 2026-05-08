@@ -1,4 +1,4 @@
-const CACHE = 'outnow-v6';
+const CACHE = 'outnow-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const ASSETS = [
   './js/auth.js',
   './js/push.js',
   './js/friends.js',
+  './js/reviews.js',
   './js/groups.js',
   './js/map.js',
   './data/events.js',
