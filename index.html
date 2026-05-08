@@ -431,7 +431,7 @@ document.getElementById('btn-new-group').addEventListener('click', function() {
   document.getElementById('btn-confirm-group').addEventListener('click', function() {
     var name = document.getElementById('new-group-name').value.trim();
   
-    if (!name) { alert('Donne un nom au groupe !'); return; }
+    if (!name) { document.getElementById('new-group-name').focus(); return; }
   
     var checked = document.querySelectorAll('#friend-picker input:checked');
     var memberIds = Array.from(checked).map(function(c) { return c.value; });
@@ -456,6 +456,38 @@ document.getElementById('btn-new-group').addEventListener('click', function() {
     navigator.serviceWorker.register('sw.js');
   }
 </script>
+  <!-- ── MODAL CONFIRM ── -->
+  <div id="confirm-modal" class="modal hidden" style="z-index:1002">
+    <div class="modal-content" style="max-width:300px;text-align:center">
+      <p id="confirm-modal-text" style="font-size:15px;margin-bottom:20px;color:var(--text)"></p>
+      <div style="display:flex;gap:10px">
+        <button class="btn-ghost" style="flex:1" id="confirm-modal-cancel">Annuler</button>
+        <button class="btn-primary" style="flex:1;background:#ef4444;border-color:#ef4444" id="confirm-modal-ok">Supprimer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODAL PROMPT ── -->
+  <div id="prompt-modal" class="modal hidden" style="z-index:1002">
+    <div class="modal-content" style="max-width:300px">
+      <p id="prompt-modal-text" style="font-size:15px;margin-bottom:12px;color:var(--text)"></p>
+      <input type="text" id="prompt-modal-input" class="text-input" style="margin-bottom:16px" />
+      <div style="display:flex;gap:10px">
+        <button class="btn-ghost" style="flex:1" id="prompt-modal-cancel">Annuler</button>
+        <button class="btn-primary" style="flex:1" id="prompt-modal-ok">OK</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MODAL MEMBRES ── -->
+  <div id="members-modal" class="modal hidden" style="z-index:1002">
+    <div class="modal-content" style="max-width:300px">
+      <h3 style="font-size:16px;font-weight:700;margin-bottom:12px">Membres du groupe</h3>
+      <div id="members-modal-list" style="margin-bottom:16px"></div>
+      <button class="btn-ghost" style="width:100%" id="members-modal-close">Fermer</button>
+    </div>
+  </div>
+
   <!-- ── MODAL PROFIL ── -->
   <div id="profile-modal" class="modal hidden" style="z-index:1000">
     <div class="modal-content" style="max-width:320px;text-align:left">
