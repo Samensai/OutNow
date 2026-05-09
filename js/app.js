@@ -12,7 +12,8 @@ var savedLikesInit = [];
 try {
   var rawLikes = localStorage.getItem('outnow_liked_events');
   if (rawLikes) savedLikesInit = JSON.parse(rawLikes);
-} catch (e) {}
+  if (!Array.isArray(savedLikesInit)) savedLikesInit = [];
+} catch (e) { savedLikesInit = []; }
 
 var state = {
   events: [],
@@ -403,11 +404,11 @@ function openDetail(ev) {
       (ev.hours ? '<div class="detail-meta-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' + ev.hours + '</div>' : '') +
 
       '<div class="detail-cta">' +
-        '<button class="btn-primary" onclick="likeFromDetail(\'' + ev.id + '\')">' +
+        '<button class="btn-primary" onclick="likeFromDetail(\'' + ev.id + '\')">'+
           (isLiked ? '❤️ Sauvegardé' : '🤍 Sauvegarder') +
         '</button>' +
         (ev.website ? '<a class="btn-website" href="' + ev.website + '" target="_blank" rel="noopener">🌐 Site officiel</a>' : '') +
-        '<button class="btn-done' + (isDone ? ' is-done' : '') + '" id="btn-mark-done" onclick="handleMarkDone(\'' + ev.id + '\')">' +
+        '<button class="btn-done' + (isDone ? ' is-done' : '') + '" id="btn-mark-done" onclick="handleMarkDone(\'' + ev.id + '\')">'+
           (isDone ? '✅ Fait !' : '☑️ Marquer comme fait') +
         '</button>' +
       '</div>' +
@@ -478,7 +479,7 @@ function renderLikes() {
     var isDone = typeof isEventDone === 'function' && isEventDone(ev.id);
 
     return '' +
-      '<div class="like-item" onclick="openLikeDetail(\'' + ev.id + '\')">' +
+      '<div class="like-item" onclick="openLikeDetail(\'' + ev.id + '\')">'+
         '<img src="' + ev.image + '" alt="' + ev.title + '" loading="lazy" />' +
         (isPast ? '<div class="like-past-badge">Passé</div>' : '') +
         (isDone ? '<div class="like-done-badge">Fait ✅</div>' : '') +

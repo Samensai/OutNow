@@ -294,20 +294,31 @@ function loadWikidataPlaces() {
 
   var url = 'https://query.wikidata.org/sparql?format=json&query=' + encodeURIComponent(WIKIDATA_SPARQL);
 
-  return fetch(url, { headers: { 'Accept': 'application/sparql-results+json' } })
-    .then(function(res) { return res.json(); })
+  var controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  var timeoutId = controller ? setTimeout(function() { controller.abort(); }, 10000) : null;
+
+  return fetch(url, {
+    headers: { 'Accept': 'application/sparql-results+json' },
+    signal: controller ? controller.signal : undefined
+  })
+    .then(function(res) {
+      if (timeoutId) clearTimeout(timeoutId);
+      return res.json();
+    })
     .then(function(data) {
       var rows = (data.results && data.results.bindings) ? data.results.bindings : [];
       var cards = rows
         .map(function(row, i) { return toWikidataCard(row, i); })
         .filter(Boolean);
 
-      // Enrichissement Wikipedia : on lance les appels en parallèle (max 8 simultanés)
-      // pour ne pas surcharger l'API et respecter un délai raisonnable
-      function enrichBatch(cards, batchSize) {
+      WIKIDATA_LOADED = true;
+      WIKIDATA_LOADING = false;
+
+      // Enrichissement Wikipedia en arrière-plan — ne bloque pas l'affichage des cartes
+      function enrichBatch(list, batchSize) {
         var batches = [];
-        for (var i = 0; i < cards.length; i += batchSize) {
-          batches.push(cards.slice(i, i + batchSize));
+        for (var i = 0; i < list.length; i += batchSize) {
+          batches.push(list.slice(i, i + batchSize));
         }
         return batches.reduce(function(chain, batch) {
           return chain.then(function() {
@@ -315,7 +326,6 @@ function loadWikidataPlaces() {
               if (!card.wikipediaTitle) return Promise.resolve();
               return fetchWikipediaSummary(card.wikipediaTitle).then(function(extract) {
                 if (extract) {
-                  // On tronque à 500 caractères pour garder quelque chose de lisible
                   card.description = extract.length > 500
                     ? extract.slice(0, 497) + '…'
                     : extract;
@@ -326,13 +336,13 @@ function loadWikidataPlaces() {
         }, Promise.resolve());
       }
 
-      return enrichBatch(cards, 8).then(function() {
-        WIKIDATA_LOADED = true;
-        WIKIDATA_LOADING = false;
-        return cards;
-      });
+      // Fire and forget : les descriptions Wikipedia se mettent à jour en fond
+      enrichBatch(cards, 8);
+
+      return cards;
     })
     .catch(function(err) {
+      if (timeoutId) clearTimeout(timeoutId);
       console.error('loadWikidataPlaces error:', err);
       WIKIDATA_LOADING = false;
       return [];
