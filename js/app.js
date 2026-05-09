@@ -8,6 +8,15 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+function maybeHideHomeLoader() {
+  var el = window._homeLoader;
+  if (!el || el.style.display === 'none') return;
+  window._homeLoader = null;
+  if (typeof hideLoaderAfterCycle === 'function') {
+    hideLoaderAfterCycle(el, window._appLoadStart || Date.now());
+  }
+}
+
 var savedLikesInit = [];
 try {
   var rawLikes = localStorage.getItem('outnow_liked_events');
@@ -142,6 +151,7 @@ function renderCards() {
         '<h3>Plus de sorties !</h3>' +
         '<p style="color:var(--text3);font-size:14px;margin-top:8px">Change tes filtres ou reviens plus tard.</p>' +
       '</div>';
+    maybeHideHomeLoader();
     return;
   }
 
@@ -155,6 +165,8 @@ function renderCards() {
       setupSwipe(card, ev);
     }
   });
+
+  maybeHideHomeLoader();
 
   if (state.deck.length < 5 && !EVENTS_LOADING && !EVENTS_EXHAUSTED) {
     loadEvents().then(function() {
@@ -196,6 +208,46 @@ function createCard(ev, idx) {
   });
 
   return div;
+}
+
+function advanceCards() {
+  if (state.deck.length === 0) { renderCards(); return; }
+
+  var cards = cardStack.querySelectorAll('.event-card');
+
+  // Safety: if DOM is out of sync with deck, fall back to full rebuild
+  if (cards.length === 0 || String(cards[0].dataset.id) !== String(state.deck[0].id)) {
+    renderCards();
+    return;
+  }
+
+  // Promote behind → front (behind card never had swipe handlers)
+  var newFront = cards[0];
+  newFront.classList.remove('behind', 'third');
+  newFront.classList.add('front');
+  setupSwipe(newFront, state.deck[0]);
+
+  // Promote third → behind
+  if (cards.length > 1) {
+    cards[1].classList.remove('third');
+    cards[1].classList.add('behind');
+  }
+
+  // Remove any extra stale cards
+  for (var i = cards.length - 1; i >= 2; i--) {
+    cards[i].remove();
+  }
+
+  // Add fresh third card from deck if available
+  if (state.deck.length >= 3) {
+    var newCard = createCard(state.deck[2], 2);
+    newCard.classList.add('third');
+    cardStack.appendChild(newCard);
+  }
+
+  if (state.deck.length < 5 && !EVENTS_LOADING && !EVENTS_EXHAUSTED) {
+    loadEvents().then(function() { buildDeck(); });
+  }
 }
 
 function setupSwipe(card, ev) {
@@ -294,7 +346,7 @@ function swipeCard(direction, card, ev) {
 
   setTimeout(function() {
     card.remove();
-    renderCards();
+    advanceCards();
   }, 400);
 }
 
@@ -393,11 +445,11 @@ function openDetail(ev) {
       (ev.hours ? '<div class="detail-meta-row"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>' + ev.hours + '</div>' : '') +
 
       '<div class="detail-cta">' +
-        '<button class="btn-primary" onclick="likeFromDetail(\'' + ev.id + '\')">' +
+        '<button class="btn-primary" onclick="likeFromDetail(\'' + ev.id + '\'')">' +
           (isLiked ? '❤️ Sauvegardé' : '🤍 Sauvegarder') +
         '</button>' +
         (ev.website ? '<a class="btn-website" href="' + ev.website + '" target="_blank" rel="noopener">🌐 Site officiel</a>' : '') +
-        '<button class="btn-done' + (isDone ? ' is-done' : '') + '" id="btn-mark-done" onclick="handleMarkDone(\'' + ev.id + '\')">' +
+        '<button class="btn-done' + (isDone ? ' is-done' : '') + '" id="btn-mark-done" onclick="handleMarkDone(\'' + ev.id + '\'')">' +
           (isDone ? '✅ Fait !' : '☑️ Marquer comme fait') +
         '</button>' +
       '</div>' +

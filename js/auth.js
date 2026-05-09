@@ -61,12 +61,13 @@ function startApp() {
   // Afficher le loader home
   var homeLoader = document.getElementById('home-loading');
   if (homeLoader) { homeLoader.style.display = 'flex'; homeLoader.style.opacity = '1'; }
-  var loadStart = Date.now();
+  window._appLoadStart = Date.now();
+  window._homeLoader = homeLoader;
 
   loadEvents().then(function() {
     buildDeck();
     renderCards();
-    hideLoaderAfterCycle(homeLoader, loadStart);
+    // Le loader est masqué par maybeHideHomeLoader() dans renderCards()
   });
 
   updateProfileUI();
